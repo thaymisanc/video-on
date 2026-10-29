@@ -17,7 +17,7 @@ Videos are 8-second loops and play on the focused card after 1 second.
 
 ## Original clips
 
-`video assets/originals/*.mov` are the full-quality source clips (about 720MB). They are stored with Git LFS, so run `git lfs install` once before cloning. The prototype itself only plays the small `.mp4` loops in `video assets`.
+The prototype itself only plays the small `.mp4` loops in `video assets`.
 
 ## Notes
 
