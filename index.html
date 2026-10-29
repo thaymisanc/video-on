@@ -998,7 +998,7 @@ window.addEventListener('keydown',e=>{
 B.forEach((b,i)=>b.addEventListener('click',()=>{ if(st==='off') return; if(st==='ok'||i===1) hide(); else order(); }));
 window.gmShow=show;
 window.addEventListener('load',()=>{ const row=document.querySelector('#vcRemote .row'); if(!row) return; const b=document.createElement('button'); b.type='button'; b.className='gmb'; b.textContent='Show game offer'; b.addEventListener('click',()=>{ b.blur(); show(); }); row.appendChild(b); });
-window.addEventListener('keydown',e=>{ if((e.key==='n'||e.key==='N')&&!e.metaKey&&!e.ctrlKey) show(); });
+window.addEventListener('keydown',e=>{ if((e.key==='n'||e.key==='N')&&!e.metaKey&&!e.ctrlKey&&!e.altKey){ e.preventDefault(); e.stopImmediatePropagation(); if(!e.repeat) show(); } },true);
 })();
 </script>
 <script>
