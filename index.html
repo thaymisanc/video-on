@@ -1,0 +1,1754 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Fubo CTV — Voice as a native input</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+@font-face{font-family:'FT Regola Neue';font-weight:400;src:url('font/FTRegolaNeue-Regular.otf')}
+@font-face{font-family:'FT Regola Neue';font-weight:500;src:url('font/FTRegolaNeue-Medium.otf')}
+@font-face{font-family:'FT Regola Neue';font-weight:600;src:url('font/FTRegolaNeue-Semibold.otf')}
+@font-face{font-family:'FT Regola Neue';font-weight:700;src:url('font/FTRegolaNeue-Bold.otf')}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#000}
+body{font-family:'FT Regola Neue',-apple-system,BlinkMacSystemFont,sans-serif;color:#fafbff;user-select:none}
+#stage{position:absolute;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;background:#10121a}
+.ctv-page { padding-left: 160px; padding-top: 96px; padding-right: 0; }
+.ctv-carousel-section { margin-bottom: 64px; }
+.ctv-carousel-section:last-child { margin-bottom: 0; }
+.ctv-carousel-row { display: flex; gap: 32px; overflow-x: auto; scrollbar-width: none; padding: 14px 160px 14px 0; margin: -14px 0; }
+.ctv-carousel-row::-webkit-scrollbar { display: none; }
+
+.ctv-navbar {
+  position: fixed; left: 0; top: 0; bottom: 0;
+  width: 72px; z-index: 1000;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 32px 0 40px;
+  transition: width 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: visible;
+}
+.ctv-navbar.expanded { width: 280px; align-items: flex-start; padding-left: 28px; padding-right: 28px; }
+.ctv-navbar::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 200px;
+  background:
+    radial-gradient(ellipse 140px 350px at 0% 32%, rgba(17,22,49,0.9) 0%, transparent 100%),
+    radial-gradient(ellipse 120px 250px at 0% 42%, rgba(34,30,75,0.75) 0%, transparent 100%),
+    radial-gradient(ellipse 100px 200px at 0% 50%, rgba(53,34,71,0.7) 0%, transparent 100%),
+    radial-gradient(ellipse 90px 180px at 0% 55%, rgba(83,29,44,0.65) 0%, transparent 100%),
+    radial-gradient(ellipse 80px 160px at 0% 60%, rgba(93,26,22,0.55) 0%, transparent 100%),
+    radial-gradient(ellipse 60px 120px at 0% 68%, rgba(72,17,9,0.4) 0%, transparent 100%);
+  pointer-events: none; z-index: -1;
+}
+.ctv-navbar::after {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 100%;
+  background: linear-gradient(to right, rgba(16,18,26,0.88) 0%, rgba(16,18,26,0.65) 70%, transparent 100%);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  pointer-events: none; z-index: -2;
+}
+.ctv-navbar.expanded::after { background: rgba(16,18,26,0.93); }
+.ctv-nav-profile {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: linear-gradient(135deg, #e87461 0%, #c95a8a 100%);
+  flex-shrink: 0; margin-bottom: 36px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  outline: 3px solid transparent; outline-offset: 3px;
+}
+.ctv-nav-profile.focused { outline-color: #fafbff; }
+.ctv-navbar.expanded .ctv-nav-profile { width: auto; height: auto; border-radius: 100px; padding: 6px 20px 6px 6px; background: rgba(255,255,255,0.06); gap: 12px; }
+.ctv-navbar.expanded .ctv-nav-profile.focused { background: rgba(255,255,255,0.12); }
+.ctv-nav-profile-avatar { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #e87461 0%, #c95a8a 100%); flex-shrink: 0; }
+.ctv-nav-profile-name { display: none; font-size: 16px; font-weight: 500; color: #fafbff; white-space: nowrap; }
+.ctv-navbar.expanded .ctv-nav-profile-name { display: block; }
+.ctv-nav-items { display: flex; flex-direction: column; gap: 2px; width: 100%; align-items: center; }
+.ctv-navbar.expanded .ctv-nav-items { align-items: flex-start; }
+.ctv-nav-item {
+  display: flex; align-items: center; gap: 14px; padding: 12px 14px;
+  border-radius: 100px; transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative; color: rgba(162,167,192,0.8);
+  width: auto; white-space: nowrap; outline: 3px solid transparent; outline-offset: 2px;
+}
+.ctv-navbar.expanded .ctv-nav-item { padding: 12px 20px; }
+.ctv-nav-item.focused { background: rgba(255,255,255,0.12); color: #fafbff; outline-color: #fafbff; }
+.ctv-nav-item.active { color: #fafbff; }
+.ctv-nav-item.active:not(.focused) { background: none; }
+.ctv-nav-item.active.focused { background: rgba(255,255,255,0.14); }
+.ctv-nav-item .icon-outline, .ctv-nav-item .icon-filled { width: 24px; height: 24px; flex-shrink: 0; }
+.ctv-nav-item .icon-filled { display: none; }
+.ctv-nav-item .icon-outline { display: block; }
+.ctv-nav-item.active .icon-filled { display: block; }
+.ctv-nav-item.active .icon-outline { display: none; }
+.ctv-nav-item-label { display: none; font-size: 17px; font-weight: 400; letter-spacing: 0.01em; }
+.ctv-nav-item.active .ctv-nav-item-label { font-weight: 600; }
+.ctv-navbar.expanded .ctv-nav-item-label { display: block; }
+.ctv-nav-logo { margin-top: auto; display: none; align-self: flex-end; opacity: 0.6; }
+.ctv-navbar.expanded .ctv-nav-logo { display: block; }
+.ctv-nav-logo svg { width: 56px; height: auto; }
+.ctv-nav-flyout {
+  position: absolute; left: 280px; top: 0; width: 340px; height: 100vh;
+  background: rgba(16,18,26,0.96); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  padding: 32px 24px; display: none; flex-direction: column; gap: 4px;
+  opacity: 0; transform: translateX(-20px); transition: opacity 220ms ease, transform 220ms ease;
+  border-left: 1px solid rgba(255,255,255,0.06);
+}
+.ctv-nav-flyout.visible { display: flex; opacity: 1; transform: translateX(0); }
+.ctv-flyout-item {
+  display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-radius: 100px;
+  color: rgba(200,204,223,0.9); transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  outline: 3px solid transparent; outline-offset: 2px; font-size: 16px;
+}
+.ctv-flyout-item.focused { background: rgba(255,255,255,0.12); color: #fafbff; outline-color: #fafbff; }
+.ctv-flyout-item.selected { color: #fafbff; font-weight: 500; }
+.ctv-flyout-avatar { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; }
+.ctv-flyout-divider { height: 1px; background: rgba(255,255,255,0.07); margin: 8px 0; }
+.ctv-flyout-item svg { width: 20px; height: 20px; flex-shrink: 0; opacity: 0.7; }
+.ctv-flyout-item.focused svg { opacity: 1; }
+.ctv-flyout-version { margin-top: auto; padding: 8px 18px; font-size: 13px; color: #505468; line-height: 1.6; }
+.ctv-navbar.flyout-open .ctv-nav-items { opacity: 0.25; pointer-events: none; }
+.ctv-navbar.flyout-open .ctv-nav-profile { opacity: 1; }
+
+/* Navbar sizing override for the 1920x1080 stage — matches components/navbar Figma exports (locked navbar.css/.html/.js untouched) */
+.ctv-navbar{width:136px;padding:72px 0 40px}
+.ctv-navbar.expanded{width:1920px;align-items:flex-start;padding:72px 0 40px 72px}
+.ctv-navbar.expanded::after{background:rgba(0,0,0,.94);backdrop-filter:none}
+.ctv-nav-profile{width:48px;height:48px;margin-bottom:0;outline-width:4px;outline-offset:4px;background:linear-gradient(135deg,#ffb36b 0%,#e2495f 55%,#b8347a 100%)}
+.ctv-nav-profile-avatar{width:48px;height:48px;background:linear-gradient(135deg,#ffb36b 0%,#e2495f 55%,#b8347a 100%)}
+.ctv-navbar.expanded .ctv-nav-profile{padding:0;margin-left:20px;gap:20px;background:none;width:auto;height:auto;border-radius:100px}
+.ctv-navbar.expanded .ctv-nav-profile.focused{background:rgba(255,255,255,.12);padding:12px 32px 12px 12px;margin-left:8px}
+.ctv-nav-profile-name{font-size:30px;font-weight:600}
+.ctv-nav-items{margin-top:165px;gap:8px}
+.ctv-nav-item{width:72px;height:72px;padding:0;justify-content:center;gap:0;border-radius:50%;outline-width:4px;outline-offset:3px;color:rgba(200,204,223,.7)}
+.ctv-nav-item .icon-outline,.ctv-nav-item .icon-filled{width:36px;height:36px}
+.ctv-nav-item.active{background:rgba(255,255,255,.1);color:#fafbff}
+.ctv-nav-item.active:not(.focused){background:rgba(255,255,255,.1)}
+.ctv-nav-item.focused,.ctv-nav-item.active.focused{background:rgba(255,255,255,.18)}
+.ctv-navbar.expanded .ctv-nav-item{width:auto;min-width:72px;padding:0 36px 0 18px;justify-content:flex-start;gap:20px;border-radius:100px}
+.ctv-nav-item-label{font-size:30px;font-weight:600;letter-spacing:0}
+.ctv-nav-item.active .ctv-nav-item-label{font-weight:700}
+.ctv-navbar.expanded .ctv-nav-items{align-items:flex-start;margin-left:0}
+.ctv-nav-logo svg{width:96px}
+.ctv-navbar.expanded .ctv-nav-logo{position:absolute;right:120px;bottom:90px;opacity:1}
+.ctv-nav-flyout{left:480px;top:0;width:480px;padding:72px 24px 40px;background:none;backdrop-filter:none;border-left:0;gap:16px}
+.ctv-flyout-item{font-size:28px;font-weight:600;padding:14px 24px;gap:20px}
+.ctv-flyout-avatar{width:50px;height:50px}
+.ctv-flyout-item.focused{background:#fafbff;color:#080A13}
+.ctv-flyout-item svg{width:28px;height:28px}
+.ctv-flyout-version{font-size:22px}
+/* ---- Figma-export parity (CTV - Navbar Expanded / Flyout) ---- */
+.ctv-navbar.expanded::after{background:rgba(0,0,0,.985)}
+.ctv-nav-flyout{bottom:0;padding-bottom:90px;gap:0}
+.ctv-flyout-item{min-height:80px}
+.ctv-flyout-item[data-flyout="0"],.ctv-flyout-item[data-flyout="1"],.ctv-flyout-item[data-flyout="2"]{min-height:96px;width:fit-content;padding-right:44px}
+.ctv-flyout-item svg{display:none}
+.ctv-flyout-item[data-flyout="3"] span,.ctv-flyout-item[data-flyout="4"] span,.ctv-flyout-item[data-flyout="5"] span,.ctv-flyout-item[data-flyout="6"] span{color:#c8ccdf}
+.ctv-flyout-divider{background:rgba(255,255,255,.14);margin:12px 0 16px}
+.ctv-flyout-version{padding:18px 24px 0;color:#a3a8bf}
+.ctv-flyout-item.focused{width:fit-content}
+.ctv-flyout-item,.ctv-flyout-divider,.ctv-flyout-version{flex:none}
+.ctv-flyout-divider{height:2px}
+.ctv-flyout-item.focused{outline:0}
+.ctv-nav-flyout{height:1080px}
+.ctv-navbar.expanded .ctv-nav-profile.focused,.ctv-navbar.expanded .ctv-nav-profile{outline:0}
+/* content stays faintly visible behind the expanded bar (per reference); focused item = white pill */
+.ctv-navbar.expanded::after{background:rgba(10,12,20,.88);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.ctv-navbar.expanded .ctv-nav-item.focused,.ctv-navbar.expanded .ctv-nav-item.active.focused{background:#fafbff;color:#080A13;outline:0}
+.ctv-navbar.expanded .ctv-nav-item.focused .ctv-nav-item-label{color:#080A13}
+/* no width/reflow animation: the bar snaps open, only the scrim fades (the width tween made labels slide over page content) */
+.ctv-navbar{transition:none}
+.ctv-navbar::after{transition:background .2s ease}
+.ctv-nav-item,.ctv-nav-profile{transition:background .15s ease,color .15s ease}
+
+/* ===== FUBO CTV LOCKED COMPONENT LIBRARY (prefix fc-) — values from resolved CTV tokens + reference screenshots ===== */
+:root {
+  --fc-bg: #10121a; --fc-text: #fafbff; --fc-text-subtle: #c8ccdf; --fc-text-subtlest: #a2a7c0;
+  --fc-live: #e03100; --fc-focus: #fafbff; --fc-surface: #2c2f3d; --fc-cell: #1c1f2b; --fc-ink: #080A13;
+  --fc-tag-bg: #000000D9; --fc-tag-border: #ffffff4D; --fc-tag-live-border: #0000004D; --fc-ppv: #62aaff; --fc-ppv-ink: #001C46; --fc-price: #b6f04a;
+  --fc-thumb-border: #ffffff26; --fc-track: #0000004D;
+}
+
+/* ---------- FOCUS RING (cards, chips, rows). Add class .f (or .focused) to the focused item ---------- */
+.fc-ring { position: absolute; inset: -6px; border-radius: 30px; border: 6px solid transparent; pointer-events: none; z-index: 5; transition: border-color .15s; }
+.f > .fc-tw > .fc-ring, .focused > .fc-tw > .fc-ring, .fc-card.f .fc-ring, .fc-card.focused .fc-ring { border-color: var(--fc-focus); box-shadow: 0 0 0 2px var(--fc-ink); }
+
+/* ---------- TAGS ---------- */
+.fc-tags { position: absolute; left: 16px; top: 16px; display: flex; gap: 8px; z-index: 3; }
+.fc-tag { height: 34px; padding: 0 12px; border-radius: 500px; display: inline-flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; color: var(--fc-text); white-space: nowrap; background: var(--fc-tag-bg); border: 2px solid var(--fc-tag-border); }
+.fc-tag.live { background: var(--fc-live); border-color: var(--fc-tag-live-border); color: #fff; animation: fcPulse 2.4s infinite; }
+.fc-tag.rec::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--fc-live); }
+.fc-tag.new::before { content: ''; width: 16px; height: 16px; border-radius: 50%; background: #3b82f6 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8.3l2.4 2.3 4.6-4.9' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px; }
+.fc-tag.clock::before { content: ''; width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid var(--fc-text); }
+.fc-tag.ppv { background: var(--fc-ppv); color: var(--fc-ppv-ink); border: 0; height: 44px; font-size: 22px; padding: 0 18px; }
+.fc-tag.price { background: var(--fc-price); color: #10200a; border: 0; height: 44px; font-size: 24px; padding: 0 18px; }
+.fc-tag.date { height: 44px; font-size: 22px; padding: 0 20px; background: rgba(8,10,19,.55); }
+.fc-tag.clip { height: 34px; }
+@keyframes fcPulse { 50% { opacity: .72; } }
+.fc-clock { display: inline-flex; align-items: center; height: 50px; padding: 0 24px; border-radius: 500px; border: 2px solid rgba(250,251,255,.85); background: rgba(8,10,19,.6); font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------- PROGRESS BAR (card size 6px; player size 10px with .lg) ---------- */
+.fc-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--fc-track); z-index: 3; }
+.fc-prog > i { display: block; height: 100%; border-radius: 500px; background: var(--fc-live); }
+.fc-prog.vod > i { background: var(--fc-text); }
+.fc-bar { position: relative; height: 10px; border-radius: 500px; background: rgba(255,255,255,.28); }
+.fc-bar > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 500px; background: var(--fc-live); }
+.fc-bar.vod > i { background: var(--fc-text); }
+.fc-bar > i::after { content: ''; position: absolute; right: -2px; top: 50%; width: 5px; height: 22px; border-radius: 3px; background: #fff; transform: translateY(-50%); }
+
+/* ---------- BUTTONS. States: (default) .f/.focused .dimmed .pressed [disabled] ---------- */
+.fc-btn { display: inline-flex; align-items: center; gap: 16px; height: 80px; padding: 0 36px; border-radius: 500px; font-size: 30px; font-weight: 600; color: var(--fc-text); background: rgba(255,255,255,.14); white-space: nowrap; transition: background .15s, color .15s, transform .15s; }
+.fc-btn svg { width: 32px; height: 32px; flex: none; }
+.fc-btn.dimmed, .fc-btn[disabled] { color: rgba(250,251,255,.45); background: rgba(255,255,255,.08); }
+.fc-btn.f, .fc-btn.focused { background: var(--fc-focus); color: var(--fc-ink); transform: scale(1.04); }
+.fc-btn.pressed { background: #c8ccdf; color: var(--fc-ink); transform: scale(.98); }
+/* detail-page primary (white rectangle) and ghost (text + circle icon) */
+.fc-btn.primary { border-radius: 10px; background: var(--fc-focus); color: var(--fc-ink); width: 556px; padding: 0 28px; }
+.fc-btn.primary.f, .fc-btn.primary.focused { box-shadow: 0 0 0 4px var(--fc-ink), 0 0 0 8px var(--fc-focus); transform: none; }
+.fc-btn.primary.pressed { background: #c8ccdf; }
+.fc-btn.ghost { background: transparent; border-radius: 10px; padding: 0 28px; }
+.fc-btn.ghost.f, .fc-btn.ghost.focused { background: var(--fc-focus); color: var(--fc-ink); transform: none; }
+.fc-icon-btn { width: 72px; height: 72px; border-radius: 50%; background: rgba(255,255,255,.14); color: var(--fc-text); display: inline-flex; align-items: center; justify-content: center; position: relative; transition: background .15s, color .15s, transform .15s; }
+.fc-icon-btn svg { width: 34px; height: 34px; }
+.fc-icon-btn.dimmed { color: rgba(250,251,255,.45); }
+.fc-icon-btn.f, .fc-icon-btn.focused { background: var(--fc-focus); color: var(--fc-ink); transform: scale(1.04); }
+.fc-icon-btn.pressed { background: #c8ccdf; color: var(--fc-ink); transform: scale(.96); }
+.fc-tooltip { position: absolute; bottom: calc(100% + 18px); left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 10px; background: #fff; color: var(--fc-ink); font-size: 24px; font-weight: 600; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s; }
+.fc-tooltip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 9px solid transparent; border-top-color: #fff; }
+.f > .fc-tooltip, .focused > .fc-tooltip { opacity: 1; }
+
+/* ---------- FILTER CHIPS. States: default / .on (selected, check icon) / .f focused ---------- */
+.fc-chips { display: flex; gap: 24px; padding: 10px 0; width: max-content; }
+.fc-chip { height: 72px; padding: 0 36px; border-radius: 24px; border: 3px solid rgba(250,251,255,.2); background: rgba(8,10,19,.7); display: inline-flex; align-items: center; gap: 12px; font-size: 28px; font-weight: 600; flex: none; transition: all .15s; }
+.fc-chip.on { background: rgba(250,251,255,.18); border-color: rgba(250,251,255,.5); }
+.fc-chip.on::before { content: ''; width: 32px; height: 32px; margin-left: -14px; border-radius: 50%; background: var(--fc-text) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 12.5l3.2 3.2 6.8-7' fill='none' stroke='%2310121a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/24px no-repeat; }
+.fc-chip.f, .fc-chip.focused { background: var(--fc-focus); color: var(--fc-ink); border-color: var(--fc-focus); transform: scale(1.03); }
+.fc-chip.f.on::before, .fc-chip.focused.on::before { background-color: var(--fc-ink); filter: invert(1); }
+
+/* ---------- TABS (My Stuff top tabs, Similar / About). States: default, .on (underline), .f ---------- */
+.fc-tabs { display: flex; gap: 64px; align-items: flex-end; }
+.fc-tab { font-size: 30px; font-weight: 600; color: var(--fc-text-subtle); padding: 10px 0 14px; border-bottom: 4px solid transparent; }
+.fc-tab.on { color: var(--fc-text); border-bottom-color: var(--fc-text); }
+.fc-tab.f, .fc-tab.focused { color: var(--fc-ink); background: var(--fc-focus); border-radius: 12px; padding: 10px 20px 14px; margin: 0 -20px; border-bottom-color: transparent; }
+
+/* ---------- SECTION HEADER ---------- */
+.fc-section { margin-bottom: 64px; }
+.fc-section-title { font-size: 36px; font-weight: 700; line-height: 1.2; }
+.fc-section-sub { margin-top: 8px; font-size: 24px; color: var(--fc-text-subtlest); }
+.fc-section-gap { height: 28px; }
+
+/* ---------- CARDS ---------- */
+.fc-row { display: flex; gap: 32px; width: max-content; }
+.fc-card { width: 376px; flex: none; position: relative; cursor: pointer; }
+.fc-card.lg { width: 512px; } .fc-card.wide { width: 788px; } .fc-card.clip { width: 376px; }
+.fc-tw { position: relative; transition: transform .18s ease-out; }
+.fc-card.f .fc-tw, .fc-card.focused .fc-tw { transform: scale(1.03); }
+.fc-thumb { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 24px; overflow: hidden; background: var(--fc-surface) center/cover no-repeat; box-shadow: inset 0 0 0 2px var(--fc-thumb-border); }
+.fc-card.f .fc-thumb, .fc-card.focused .fc-thumb { box-shadow: none; }
+.fc-thumb::after { content: ''; position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.fc-card.f .fc-thumb::after { animation: fcFlash .25s ease-out; }
+@keyframes fcFlash { from { opacity: .22; } to { opacity: 0; } }
+.fc-thumb.contain { background-size: contain; background-color: #1b1d28; }          /* league/team/show logos on dark slate */
+.fc-thumb .fc-corner { position: absolute; right: 16px; bottom: 18px; height: 28px; opacity: .9; z-index: 2; }
+.fc-thumb .fc-star { position: absolute; right: 14px; bottom: 14px; width: 24px; height: 24px; z-index: 2; opacity: .85; }
+.fc-foot { padding: 16px 6px 0; }
+.fc-t { font-size: 28px; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-s { margin-top: 4px; font-size: 18px; color: var(--fc-text-subtlest); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-card.lg .fc-s, .fc-card.wide .fc-s { font-size: 20px; }
+/* sports score bar (sits above the red progress bar) */
+.fc-score { position: absolute; left: 16px; right: 16px; bottom: 22px; height: 52px; border-radius: 14px; background: rgba(8,10,19,.72); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; z-index: 2; }
+.fc-score .clk { font-size: 18px; font-weight: 600; color: var(--fc-text-subtle); }
+/* square card: text overlaid */
+.fc-card.sq .fc-thumb::before, .fc-card.clip .fc-thumb::before { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(0,0,0,.5), transparent 70%), linear-gradient(0deg, rgba(8,10,19,.55), transparent 60%); }
+.fc-ov { position: absolute; left: 24px; right: 24px; bottom: 24px; z-index: 3; }
+.fc-ov .c { font-size: 18px; font-weight: 600; color: var(--fc-text-subtle); text-transform: uppercase; letter-spacing: .04em; }
+.fc-ov .h { margin-top: 6px; font-size: 28px; font-weight: 700; line-height: 1.15; }
+/* clip card (2:3 portrait with show badge) */
+.fc-card.clip .fc-thumb { aspect-ratio: 2/3; }
+.fc-card.clip .fc-thumb::before { background: linear-gradient(0deg, rgba(8,10,19,.95) 8%, rgba(8,10,19,.4) 45%, transparent 70%); }
+.fc-card.clip .fc-ov { left: 20px; right: 20px; bottom: 28px; }
+.fc-ov .bw { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.fc-ov .bd { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; border: 3px solid rgba(255,255,255,.85); }
+.fc-ov .sh { font-size: 26px; font-weight: 700; letter-spacing: .03em; font-style: italic; }
+.fc-ov .hl { font-size: 20px; line-height: 1.25; min-height: 50px; }
+/* skeleton (loading) — add .skel to a card row/chip row */
+.skel .fc-thumb, .skel .fc-chip { background: #1b1e2b !important; background-image: none !important; animation: fcSk 1s infinite alternate; }
+.skel .fc-tags, .skel .fc-prog, .skel .fc-score, .skel .fc-ov, .skel .fc-chip > * { visibility: hidden; }
+.skel .fc-t, .skel .fc-s { color: transparent; background: #1b1e2b; border-radius: 6px; width: 70%; }
+@keyframes fcSk { to { opacity: .55; } }
+
+/* ---------- LIST ROW (player guide sidebar / mini guide). States: default, .f ---------- */
+.fc-list-row { position: relative; display: flex; gap: 20px; padding: 14px; border-radius: 16px; background: rgba(255,255,255,.06); width: 600px; }
+.fc-list-row .th { position: relative; width: 280px; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: var(--fc-surface) center/cover; flex: none; }
+.fc-list-row .th .fc-tag { position: absolute; left: 12px; top: 12px; height: 30px; font-size: 18px; z-index: 2; }
+.fc-list-row .tx { min-width: 0; padding-top: 6px; }
+.fc-list-row .tt { font-size: 28px; font-weight: 700; line-height: 1.2; }
+.fc-list-row .ss { margin-top: 8px; font-size: 20px; color: var(--fc-text-subtlest); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-list-row.f, .fc-list-row.focused { outline: 6px solid var(--fc-focus); outline-offset: 0; background: rgba(255,255,255,.1); }
+
+/* ---------- GUIDE (EPG) ---------- */
+.fc-guide-row { display: flex; gap: 10px; height: 145px; align-items: stretch; }
+.fc-guide-ch { width: 208px; flex: none; background: var(--fc-cell); border-radius: 10px; display: flex; align-items: center; justify-content: center; position: relative; font-size: 30px; font-weight: 700; }
+.fc-guide-ch .st { position: absolute; left: 16px; top: 10px; color: #4da6ff; font-size: 22px; }
+.fc-guide-now { width: 258px; flex: none; border-radius: 10px; background: var(--fc-surface) center/cover; overflow: hidden; }
+.fc-guide-cell { flex: none; background: var(--fc-cell); border-radius: 10px; padding: 24px 22px; font-size: 30px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-guide-cell small { display: block; margin-top: 8px; font-size: 20px; font-weight: 400; color: var(--fc-text-subtlest); }
+.fc-guide-cell.f, .fc-guide-cell.focused { outline: 5px solid var(--fc-focus); outline-offset: 0; background: var(--fc-cell); }
+.fc-guide-time { font-size: 28px; font-weight: 600; }
+
+/* ---------- SEARCH FIELD ---------- */
+.fc-search { display: flex; align-items: center; gap: 22px; height: 106px; padding: 0 36px; background: var(--fc-cell); border-radius: 10px; font-size: 42px; font-weight: 700; color: var(--fc-text-subtlest); }
+.fc-search svg { width: 48px; height: 48px; flex: none; }
+.fc-search.f, .fc-search.focused { box-shadow: 0 0 0 6px var(--fc-focus); color: var(--fc-text); }
+
+/* ---------- TOAST ---------- */
+.fc-toast { display: inline-flex; align-items: center; gap: 20px; height: 84px; padding: 0 36px 0 24px; border-radius: 24px; background: #000; border: 3px solid var(--fc-text); font-size: 28px; font-weight: 600; }
+.fc-toast::before { content: ''; width: 36px; height: 36px; border-radius: 50%; background: #2fbf5b url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 12.5l3.2 3.2 6.8-7' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/26px no-repeat; }
+
+/* ---------- HERO (home + detail) ---------- */
+.fc-hero { position: relative; height: 640px; background: #0b0d14 center/cover; overflow: hidden; }
+.fc-hero::before { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(8,10,19,.85) 0%, rgba(8,10,19,.35) 45%, transparent 70%), linear-gradient(0deg, #10121a 0%, rgba(16,18,26,.6) 22%, transparent 55%); }
+.fc-hero-info { position: absolute; left: 178px; bottom: 56px; width: 820px; z-index: 2; }
+.fc-hero-logo { height: 52px; margin-bottom: 18px; }
+.fc-hero-flag { font-size: 20px; font-weight: 700; margin-bottom: 14px; }
+.fc-hero-title { font-size: 72px; font-weight: 700; line-height: 1.05; }
+.fc-hero-meta { margin-top: 14px; font-size: 32px; font-weight: 700; }
+.fc-hero-desc { margin-top: 12px; font-size: 30px; color: var(--fc-text-subtle); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fc-hero-actions { margin-top: 36px; display: flex; flex-direction: column; align-items: flex-start; gap: 18px; }
+
+.ctv-player-root {
+  --pl-bg: #0b0d14; --pl-text: #fafbff; --pl-text-subtle: #c8ccdf; --pl-text-subtlest: #a2a7c0;
+  --pl-live: #e03100; --pl-focus: #fafbff;
+  --pl-tag-secondary-bg: #000000D9; --pl-tag-secondary-border: #ffffff4D; --pl-tag-primary-border: #0000004D;
+  --pl-thumb-border: #ffffff26; --pl-elev-40: #2c2f3d; --pl-track: #0000004D;
+  color-scheme: dark;
+  position: fixed; inset: 0; z-index: 3000; background: #000; display: none; overflow: hidden;
+  font-family: 'FT Regola Neue', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--pl-text); user-select: none;
+}
+.ctv-player-root.open { display: block; }
+.ctv-player-root, .ctv-player-root * { box-sizing: border-box; }
+
+/* 1920x1080 stage, scaled to fit the window so token px values stay true */
+#plxStage { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; background: var(--pl-bg); }
+.ctv-player { position: absolute; inset: 0; }
+.ctv-player-bg { position: absolute; inset: 0; background: linear-gradient(135deg, #12151f 0%, #0b0d14 55%, #0f1320 100%); }
+.ctv-player-controls { position: absolute; inset: 0; z-index: 1; opacity: 1; transition: opacity 400ms ease; }
+.ctv-player-controls.hidden { opacity: 0; pointer-events: none; }
+
+/* Top info */
+.ctv-player-info { position: absolute; left: 178px; top: 70px; right: 160px; transition: opacity 250ms ease; }
+.ctv-player-badges { display: flex; align-items: center; gap: 16px; height: 44px; margin-bottom: 22px; }
+.pl-pill { height: 38px; padding: 0 16px; border-radius: 500px; display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 700; }
+.pl-live { background: var(--pl-live); color: #fff; border: 2px solid var(--pl-tag-primary-border); animation: plxPulse 2.4s infinite; }
+.pl-rec { background: var(--pl-tag-secondary-bg); border: 2px solid var(--pl-tag-secondary-border); }
+.pl-rec::before, .plx-tag.rec::before { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--pl-live); flex-shrink: 0; }
+.pl-new, .plx-tag.new { background: var(--pl-tag-secondary-bg); border: 2px solid var(--pl-tag-secondary-border); }
+@keyframes plxPulse { 50% { opacity: .72; } }
+.ctv-player-channel { height: 44px; display: flex; align-items: center; font-size: 30px; font-weight: 700; letter-spacing: -.01em; }
+.ctv-player-channel img { height: 64px; width: 64px; object-fit: contain; margin: -10px 0; }
+.ctv-player-title { font-size: 60px; font-weight: 700; line-height: 1.1; }
+.ctv-player-meta { margin-top: 14px; font-size: 30px; font-weight: 400; color: var(--pl-text-subtle); }
+
+/* Bottom controls */
+.ctv-player-bottom { position: absolute; left: 178px; right: 149px; top: 760px; height: 220px; transition: opacity 250ms ease, transform 350ms cubic-bezier(.2,.8,.2,1); }
+.plx-tray-open .ctv-player-bottom { opacity: 0; transform: translateY(-40px); pointer-events: none; }
+.plx-tray-open .ctv-player-info { opacity: .55; }
+.ctv-player-actions { display: flex; align-items: center; justify-content: space-between; height: 82px; }
+.ctv-player-actions-left, .ctv-player-actions-right { display: flex; gap: 14px; }
+.ctv-player-pillbtn {
+  height: 80px; padding: 0 36px; border-radius: 500px; display: flex; align-items: center; gap: 16px;
+  font-size: 30px; font-weight: 600; color: var(--pl-text); background: rgba(255,255,255,.14);
+  transition: background .15s, color .15s, transform .15s; white-space: nowrap;
+}
+.ctv-player-pillbtn.dimmed { color: rgba(250,251,255,.45); background: rgba(255,255,255,.08); }
+.ctv-player-icon-btn {
+  width: 72px; height: 72px; border-radius: 50%; background: rgba(255,255,255,.14); color: var(--pl-text);
+  display: flex; align-items: center; justify-content: center; position: relative; transition: background .15s, color .15s, transform .15s;
+}
+.ctv-player-pillbtn.focused, .ctv-player-icon-btn.focused { background: var(--pl-focus); color: #080A13; transform: scale(1.04); }
+.ctv-player-pillbtn.dimmed.focused { color: #080A13; opacity: .9; }
+.plx-tooltip {
+  position: absolute; bottom: calc(100% + 18px); left: 50%; transform: translateX(-50%);
+  padding: 10px 20px; border-radius: 10px; background: #fff; color: #080A13; font-size: 24px; font-weight: 600;
+  white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s;
+}
+.plx-tooltip::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 9px solid transparent; border-top-color: #fff; }
+.ctv-player-icon-btn.focused .plx-tooltip { opacity: 1; }
+
+.ctv-player-progress { position: relative; height: 10px; margin-top: 44px; border-radius: 500px; background: rgba(255,255,255,.28); }
+.ctv-player-progress-played { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 500px; transition: width 300ms linear; }
+.ctv-player-progress-played.live { background: var(--pl-live); }
+.ctv-player-progress-played.vod { background: var(--pl-text); }
+.ctv-player-progress-head { position: absolute; right: -2px; top: 50%; width: 5px; height: 22px; border-radius: 3px; background: #fff; transform: translateY(-50%); }
+.ctv-player-time { position: relative; height: 40px; margin-top: 18px; font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ctv-player-time .el { position: absolute; top: 0; transform: translateX(-50%); }
+.ctv-player-time .rem { position: absolute; right: 0; top: 0; }
+
+/* ===== More Live TV tray (same card anatomy as the CTV home carousels) ===== */
+.plx-more-tv { position: absolute; left: 0; right: 0; top: 1080px; z-index: 2; transition: transform 450ms cubic-bezier(.2,.8,.2,1), opacity 300ms ease; opacity: 0; pointer-events: none; }
+.plx-tray-open .plx-more-tv { transform: translateY(-460px); opacity: 1; pointer-events: auto; }
+.plx-more-tv .plx-viewport { position: relative; padding: 14px 0; margin: -14px 0; overflow: hidden; }
+.plx-more-tv .plx-track { display: flex; gap: 32px; padding-left: 160px; width: max-content; transition: transform .4s cubic-bezier(.2,.8,.2,1); }
+.plx-card { width: 376px; flex: none; position: relative; cursor: pointer; }
+.plx-tw { position: relative; transition: transform .18s ease-out; }
+.plx-card.f .plx-tw { transform: scale(1.03); }
+.plx-thumb { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 24px; overflow: hidden; background: var(--pl-elev-40) center/cover; box-shadow: inset 0 0 0 2px var(--pl-thumb-border); }
+.plx-card.f .plx-thumb { box-shadow: none; }
+.plx-ring { position: absolute; inset: -6px; border-radius: 30px; border: 6px solid transparent; pointer-events: none; z-index: 5; transition: border-color .15s; }
+.plx-card.f .plx-ring { border-color: var(--pl-focus); box-shadow: 0 0 0 2px #080A13; }
+.plx-tag { position: absolute; left: 16px; top: 16px; height: 34px; padding: 0 12px; border-radius: 500px; display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; z-index: 3; }
+.plx-tag.live { background: var(--pl-live); color: #fff; border: 2px solid var(--pl-tag-primary-border); animation: plxPulse 2.4s infinite; }
+.plx-tag.time, .plx-tag.rec { background: var(--pl-tag-secondary-bg); border: 2px solid var(--pl-tag-secondary-border); }
+.plx-tag.rec::before { width: 10px; height: 10px; }
+.plx-tag + .plx-tag { left: auto; }
+.plx-tags { position: absolute; left: 16px; top: 16px; display: flex; gap: 8px; z-index: 3; }
+.plx-tags .plx-tag { position: static; }
+.plx-score { position: absolute; left: 16px; right: 16px; bottom: 22px; height: 52px; border-radius: 14px; background: rgba(8,10,19,.72); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; z-index: 2; }
+.plx-score .plx-clk { font-size: 18px; font-weight: 600; color: var(--pl-text-subtle); }
+.plx-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--pl-track); z-index: 3; }
+.plx-prog i { display: block; height: 100%; border-radius: 500px; background: var(--pl-live); }
+.plx-foot { padding: 16px 6px 0; }
+.plx-foot .plx-t { font-size: 28px; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plx-foot .plx-s { margin-top: 4px; font-size: 18px; color: var(--pl-text-subtlest); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.plx-chips { display: flex; gap: 24px; padding: 10px 0 10px 160px; margin-top: 30px; width: max-content; }
+.plx-chip { height: 80px; padding: 0 32px; border-radius: 16px; border: 3px solid rgba(250,251,255,.2); background: rgba(8,10,19,.7); display: flex; align-items: center; gap: 12px; font-size: 28px; font-weight: 600; flex: none; transition: all .15s; }
+.plx-chip.on { background: rgba(250,251,255,.18); border-color: rgba(250,251,255,.5); }
+.plx-chip.f { background: #fafbff; color: #080A13; border-color: #fafbff; transform: scale(1.03); }
+.plx-chip svg { margin-left: -14px; }
+.plx-chips { transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+.plx-chip.ask { border: 3px solid #0368ff; background: rgba(3,104,255,.15); letter-spacing: .28px; color: #fafbff; }
+.plx-chip.ask svg { margin-left: 0; flex: none; }
+.plx-chip.ask.f { background: #0368ff; border-color: #0368ff; color: #fafbff; transform: none; }
+
+.ctv-player-hint { position: absolute; bottom: 8px; right: 16px; font-size: 12px; color: rgba(200,204,223,.5); z-index: 10; transition: opacity .6s; }
+.ctv-player-hint.fade-out { opacity: 0; }
+
+/* ---- Home page (layout only; visuals from fc-*) ---- */
+.page{position:absolute;inset:0;transition:opacity .25s}
+.page.hide{opacity:0;pointer-events:none}
+#hero{position:absolute;left:0;top:0;width:1920px;height:900px;background:#0b0d14 center 22%/cover;transition:background-image .3s}
+#hero::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,10,19,.8) 0%,rgba(8,10,19,.3) 45%,transparent 70%),linear-gradient(0deg,#10121a 0%,rgba(16,18,26,.7) 30%,transparent 62%)}
+#hInfo{position:absolute;left:178px;top:250px;width:900px;z-index:2;transition:opacity .2s}
+#hInfo .fc-hero-title{font-size:80px}
+#hClock{position:absolute;right:64px;top:48px;z-index:3}
+#feed{position:absolute;left:0;top:0;width:1920px;transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+.sec{position:absolute;left:160px;width:1760px}
+.sec .fc-section-title{margin-bottom:24px}
+.rowclip{overflow:hidden;width:1760px;padding:14px 0 14px 14px;margin:-14px 0 -14px -14px}
+.rtrack{display:flex;gap:32px;width:max-content;transition:transform .3s cubic-bezier(.2,.8,.2,1);padding-right:160px}
+.fc-card .fc-t{font-size:28px}
+.fc-thumb.pos{background-position:center 30%}
+#soon{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:48px;font-weight:700;color:var(--fc-text-subtle)}
+#toast{position:absolute;left:50%;bottom:64px;transform:translateX(-50%);z-index:70;opacity:0;transition:opacity .25s;pointer-events:none}
+#toast.show{opacity:1}
+#detail{position:absolute;inset:0;z-index:60;background:#10121a;opacity:0;pointer-events:none;transition:opacity .25s}
+#detail.open{opacity:1;pointer-events:auto}
+#detail .fc-hero{height:1080px}
+#detail .fc-hero-info{bottom:150px;width:1000px}
+#detail .fc-btn.primary{width:556px}
+/* Zoom-out carousels: Up (again) from the peek pulls the camera back from the player into endless Fubo-style rows. Focus a card and its preview plays. */
+#lsG{position:absolute;inset:0;z-index:26;visibility:hidden;pointer-events:none;overflow:hidden}
+#lsG.on{visibility:visible}
+#lsG .bk{position:absolute;inset:0;background:rgba(6,8,15,.94);opacity:0;transition:opacity .6s ease}
+#lsG.in .bk{opacity:1}
+#lsG .gx{position:absolute;left:0;top:0;width:1920px;height:1080px;}
+#lsG .rs{position:absolute;left:0;top:0;width:1920px;transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+#lsG .rw{position:absolute;left:0;width:1920px;height:270px;transition:opacity .4s ease}
+#lsG .rw.dim{opacity:.38}
+#lsG .rw.past{opacity:.38}
+#lsG .rw.gone{opacity:0}
+#lsG:not(.in) .rw:not(.cur){opacity:0}
+#lsG .trk{position:absolute;left:0;top:0;width:1920px;height:270px;transition:transform .45s cubic-bezier(.2,.8,.2,1)}
+#lsG .gc{position:absolute;top:0;width:480px;height:270px;border-radius:0;overflow:hidden;background:#12151f;box-shadow:inset 0 0 0 2px rgba(255,255,255,.14);transition:border-radius .8s cubic-bezier(.22,.9,.24,1),opacity .4s ease,box-shadow .35s ease,transform .45s cubic-bezier(.2,.8,.2,1)}
+#lsG.in .gc{border-radius:30px}
+#lsG .gc .ga{position:absolute;inset:-14px;background-size:cover;background-position:center}
+#lsG .gc::after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,rgba(6,8,15,.88) 0%,rgba(6,8,15,0) 56%)}
+#lsG .gc .gt{position:absolute;left:16px;top:14px;z-index:2;display:flex;gap:6px;transition:opacity .4s ease}
+#lsG .gc .gi{position:absolute;left:18px;right:18px;bottom:14px;z-index:2;transition:opacity .4s ease}
+#lsG .gc .gi .t{font-size:30px;font-weight:700;line-height:1.12;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lsG .gc .gi .s{margin-top:4px;font-size:20px;color:var(--fc-text-subtle);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lsG:not(.in) .gc .gt,#lsG:not(.in) .gc .gi{opacity:0}
+#lsG .gc.f{box-shadow:0 0 0 5px #fafbff,0 0 0 9px rgba(6,8,15,.9),0 24px 70px rgba(0,0,0,.55);z-index:3}
+#lsG.out .rw:not(.cur){opacity:0}
+#lsG.out .gc:not(.f){opacity:0}
+#lsG.out .gc.f{border-radius:0}
+#lsG.out .gc.f .gt,#lsG.out .gc.f .gi
+
+@property --lsa{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes lsSpin{to{--lsa:360deg}}
+/* focus: gentle grow */
+#lsG.in .gc.f,#lsG.out .gc.f{transform:scale(1.44)}
+
+/* no ring / hairline while the camera is zooming (they scale up into a fat border) */
+#lsG:not(.in) .gc,#lsG.out .gc{box-shadow:none}
+#lsG.out .gc.f{transition:border-radius .8s cubic-bezier(.22,.9,.24,1),box-shadow .25s ease,transform .45s cubic-bezier(.2,.8,.2,1)}
+
+#lsG .gx{transition:opacity .5s ease}
+#lsG:not(.in) .gx{opacity:0}
+#lsG .gh{z-index:9;pointer-events:none}
+#lsG.hold .gc.f:not(.gh){opacity:0}
+#lsG.snap .gc.f:not(.gh){transition:transform .45s cubic-bezier(.2,.8,.2,1),box-shadow .35s ease}
+
+#lsG .gc.pk{opacity:.5}
+#lsG .gc .gt,#lsG .gc .gi{}
+
+/* the next row peeks in from below, art only, fading out toward the bottom edge */
+#lsG .rw.dim .gt,#lsG .rw.dim .gi,#lsG .rw.past .gt,#lsG .rw.past .gi{opacity:0}
+#lsG .gx{-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 30%,#000 70%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 30%,#000 70%,transparent 100%)}
+/* the moving hero never carries a hairline/ring: they scale up with it and show as an edge glitch */
+#lsG .gh{box-shadow:none!important;outline:0}
+#lsG .gh::after{border-radius:inherit}
+
+/* while the browse view is up, the peeked player card is fully replaced by the hero: hide it so its edge/radius can't show through */
+#plxStage.lsg .ctv-player{opacity:0!important;transition:none!important}
+#lsG .gh{background:transparent;will-change:transform;backface-visibility:hidden}
+#lsG .gh .ga{inset:0}
+
+/* neighbours ease aside when a card takes focus */
+#lsG.in .rw.cur .gc.sl,#lsG.in .rw.cur .gc.sr{transform:translateX(var(--dx))}
+#lsG .rw{transition:opacity .4s ease,transform .6s cubic-bezier(.22,.9,.24,1)}
+#lsG.in .rw.past{transform:translateY(-40px)}
+#lsG.in .rw.dim{transform:translateY(40px)}
+#lsG .gc{transition:border-radius .8s cubic-bezier(.22,.9,.24,1),opacity .4s ease,box-shadow .35s ease,transform .6s cubic-bezier(.22,.9,.24,1)}
+
+/* ===== Launch-into-live core (composition only; visuals use fc-* + the locked player) ===== */
+#plxStage .ctv-player{transition:transform .55s cubic-bezier(.2,.8,.2,1),border-radius .55s cubic-bezier(.2,.8,.2,1);transform-origin:50% 50%}
+#plxStage.ls-peek .ctv-player{transform:scale(.9);border-radius:48px;overflow:hidden}
+#lsBack{position:absolute;inset:0;background:#0b0d14;pointer-events:none}
+.lsN{position:absolute;top:54px;width:1728px;height:972px;border-radius:48px;overflow:hidden;background:#10121a;opacity:0;transition:transform .55s cubic-bezier(.2,.8,.2,1),opacity .45s ease}
+#plxStage.ls-peek .lsN{opacity:1}
+#lsNL{left:-1648px;transform:scale(.94);transform-origin:100% 50%}
+#lsNR{left:1840px;transform:scale(.94);transform-origin:0 50%}
+.lsN::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 2px rgba(255,255,255,.15);pointer-events:none;z-index:5}
+.lsN .art{position:absolute;inset:0;background-size:cover;filter:brightness(.8)}
+#lsNL .art{background-position:right center}
+#lsNR .art{background-position:left center}
+.lsN .shade{position:absolute;inset:0;background:rgba(11,13,20,.35)}
+.lsN .logo{position:absolute;top:50%;width:56px;height:56px;margin-top:-28px;object-fit:contain;z-index:3}
+#lsNL .logo{right:12px}
+#lsNR .logo{left:12px}
+#lsDots{position:absolute;left:0;right:0;bottom:17px;display:flex;justify-content:center;align-items:center;gap:12px;opacity:0;transition:opacity .4s ease}
+#plxStage.ls-peek #lsDots{opacity:1}
+#lsDots i{width:10px;height:10px;border-radius:5px;background:rgba(255,255,255,.3);transition:width .3s ease,background .3s ease}
+#lsDots i.on{width:32px;background:var(--fc-text)}
+#lsVideo{position:absolute;inset:0;overflow:hidden;background:#0b0d14}
+#lsVideo .art{position:absolute;inset:-40px;background-size:cover;background-position:center;animation:lsDrift 26s ease-in-out infinite alternate}
+@keyframes lsDrift{from{transform:scale(1.02) translate(0,0)}to{transform:scale(1.1) translate(-18px,-10px)}}
+#lsVideo::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,10,19,.72) 0%,rgba(8,10,19,0) 30%,rgba(8,10,19,0) 52%,rgba(8,10,19,.88) 100%);transition:opacity .4s ease}
+#plxStage.lsc-clear #lsVideo::after{opacity:0}
+#lsFlash{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:25}
+#lsToast{position:absolute;right:170px;top:72px;z-index:30;opacity:0;transition:opacity .3s ease;pointer-events:none;max-width:860px;height:auto;min-height:84px;padding:18px 36px;white-space:normal;line-height:1.25}
+#lsToast.ok::before{display:inline-block}
+#lsToast::before{display:none}
+#lsToast.show{opacity:1}
+#lsC{position:absolute;inset:0;z-index:15;pointer-events:none}
+#plxStage.lsc-open .ctv-player-bottom{opacity:0!important;pointer-events:none}
+
+/* no homepage in this flow: the player is the only surface */
+#stage{visibility:hidden}
+body{background:#000}
+/* bigger channel logos: peeking neighbours + the one beside the LIVE tag (override only; locked component untouched) */
+.lsN .logo{width:72px;height:72px;margin-top:-36px}
+#lsNL .logo{right:4px}
+#lsNR .logo{left:4px}
+#plxStage .ctv-player-channel img{height:96px;width:132px;margin:-26px 0;object-fit:contain;object-position:left center}
+
+/* image fit: portrait posters sit whole on a blurred copy of themselves; landscape art is not zoomed */
+#lsG .gc .ga{inset:0}
+#lsG .ga.pt,#lsVideo .art.pt{isolation:isolate;background-image:none!important}
+#lsG .ga.pt::before,#lsVideo .art.pt::before{content:'';position:absolute;inset:-40px;background:var(--im) center/cover no-repeat;filter:blur(32px) brightness(.62)}
+#lsG .ga.pt::after,#lsVideo .art.pt::after{content:'';position:absolute;inset:0;background:var(--im) center/contain no-repeat}
+#lsVideo .art.pt{inset:0}
+#lsVideo video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .6s ease}
+#lsVideo video.on{opacity:1}
+/* ===== Voice as a native input (prototype) ===== */
+.ctv-player-root{right:0!important;background:#000!important}
+#plxStage{border-radius:0}
+#vcTV{position:absolute;pointer-events:none;border-radius:14px;background:#08080b;box-shadow:0 0 0 1px rgba(255,255,255,.1),0 36px 90px rgba(0,0,0,.65),0 0 180px rgba(74,84,200,.16),inset 0 0 0 1px #000}
+#vcRemote{position:fixed;top:0;right:0;bottom:0;width:200px;z-index:3100;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(120% 80% at 50% 40%,#12141f 0%,#07080d 70%);font:400 13px/1.3 'FT Regola Neue',-apple-system,BlinkMacSystemFont,sans-serif;color:#a2a7c0;user-select:none}
+#vcRemote .rm{position:relative;width:196px;padding:26px 0 34px;border-radius:70px;background:linear-gradient(160deg,#252837 0%,#14161f 55%,#0d0e15 100%);box-shadow:inset 0 1.5px 0 rgba(255,255,255,.14),inset 0 0 0 1px rgba(255,255,255,.06),0 40px 80px rgba(0,0,0,.6);display:flex;flex-direction:column;align-items:center;gap:26px}
+#vcRemote .led{width:6px;height:6px;border-radius:50%;background:#2a2d3b;transition:background .3s,box-shadow .3s}
+#vcRemote.live .led{background:#7aa7ff;box-shadow:0 0 12px 3px rgba(122,167,255,.8)}
+#vcRemote .rb{appearance:none;border:0;cursor:pointer;color:#fafbff;font:inherit;display:flex;align-items:center;justify-content:center;border-radius:50%;background:linear-gradient(160deg,#343849,#1c1e2a);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 4px 10px rgba(0,0,0,.4);transition:transform .12s ease,background .2s ease}
+#vcRemote .rb:active{transform:scale(.94)}
+#vcRemote .mic{width:74px;height:74px;position:relative}
+#vcRemote .mic svg{width:30px;height:30px}
+#vcRemote.live .mic{background:linear-gradient(135deg,#7aa7ff,#c77dff 55%,#ff9ec4);box-shadow:0 0 0 6px rgba(199,125,255,.22),0 0 40px rgba(122,167,255,.7);transform:scale(1.06)}
+#vcRemote .dp{position:relative;width:150px;height:150px;border-radius:50%;background:linear-gradient(160deg,#1e202c,#12131a);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 0 0 1px rgba(255,255,255,.05)}
+#vcRemote .dp .rb{position:absolute;width:44px;height:44px;background:transparent;box-shadow:none;border-radius:12px;color:#c8ccdf}
+#vcRemote .dp .rb:hover{background:rgba(255,255,255,.08)}
+#vcRemote .dp .u{left:53px;top:6px}#vcRemote .dp .d{left:53px;bottom:6px}#vcRemote .dp .l{left:6px;top:53px}#vcRemote .dp .r{right:6px;top:53px}
+#vcRemote .dp .ok{left:46px;top:46px;width:58px;height:58px;border-radius:50%;background:linear-gradient(160deg,#343849,#1c1e2a);box-shadow:inset 0 1px 0 rgba(255,255,255,.18);font-size:13px;font-weight:700}
+#vcRemote .dp svg{width:18px;height:18px}
+#vcRemote .rr{display:flex;gap:34px}
+#vcRemote .rr .rb{width:54px;height:54px}
+#vcRemote .rr svg{width:22px;height:22px}
+#vcRemote .cap{text-align:center;color:#a2a7c0;max-width:300px}
+#vcRemote .cap b{color:#fafbff;font-weight:600}
+#vcRemote .sw{display:flex;gap:6px;padding:3px;border-radius:500px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)}
+#vcRemote .sw span{padding:7px 14px;border-radius:500px;cursor:pointer;color:#a2a7c0;transition:background .15s,color .15s}
+#vcRemote .sw span.on{background:#fafbff;color:#080a13}
+#vcRemote .row{display:flex;flex-direction:column;align-items:center;gap:8px}
+/* listening */
+#vcL{position:absolute;inset:0;z-index:50;pointer-events:none;opacity:0;transition:opacity .5s ease;--lv:0}
+#vcL.on{opacity:1}
+#vcL .dim{position:absolute;inset:0;background:linear-gradient(0deg,rgba(6,7,12,.3) 0%,rgba(6,7,12,.14) 22%,rgba(6,7,12,0) 44%)}
+@property --vca{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes vcSpin{to{--vca:360deg}}
+#vcL .glow{position:absolute;left:96px;right:96px;top:54px;bottom:54px;border-radius:44px;padding:3px;background:conic-gradient(from var(--vca),#16226b,#4a2380,#8a2a1c,#4a2380,#16226b);animation:vcSpin 3.6s linear infinite;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:calc(.45 + var(--lv)*.2)}
+#vcL .cap{position:absolute;left:0;right:0;bottom:120px;display:flex;justify-content:center}
+#vcL .pill{position:relative;display:flex;align-items:center;width:88px;min-height:88px;max-width:1360px;border-radius:44px;overflow:hidden;isolation:isolate;transform:translateY(16px) scale(.88);transition:transform .6s cubic-bezier(.2,1.25,.3,1),width .4s cubic-bezier(.3,.8,.2,1);background:linear-gradient(120deg,rgba(61,87,214,.34) 0%,rgba(111,63,184,.3) 55%,rgba(210,67,46,.26) 100%);-webkit-backdrop-filter:blur(26px) saturate(190%);backdrop-filter:blur(26px) saturate(190%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+#vcL.on .pill{transform:none}
+#vcL .pill::before{content:'';display:none;position:absolute;inset:0;border-radius:inherit;padding:1.5px;z-index:2;pointer-events:none;background:none;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+#vcL .pill::after{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,0) 55%)}
+#vcL .pill .ic{position:relative;z-index:1;flex:none;width:88px;height:88px;display:flex;align-items:center;justify-content:center}
+#vcL .pill .wv{display:flex;align-items:center;justify-content:center;gap:5px;height:56px}
+#vcL .pill .wv i{display:block;width:4px;height:14px;border-radius:2px;background:#fafbff;transition:height .09s linear}
+#vcL .pill .tx{position:relative;z-index:1;flex:0 1 auto;min-width:0;margin-right:42px;overflow:hidden;white-space:nowrap;font-size:36px;font-weight:600;line-height:88px;height:88px;color:#fafbff;opacity:0;transition:opacity .35s ease}
+#vcL .pill .tx.ov{-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 56px);mask-image:linear-gradient(90deg,transparent 0,#000 56px)}
+#vcL .pill.has .tx{opacity:1}
+#vcL .tx .cur{display:inline-block;width:3px;height:32px;margin-left:5px;vertical-align:-5px;background:#fafbff;animation:vcB 1s steps(2) infinite}
+@keyframes vcB{50%{opacity:0}}
+#vcL.think .tx{background:linear-gradient(90deg,#c8ccdf 20%,#fff 50%,#c8ccdf 80%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:vcSh 1.2s linear infinite}
+@keyframes vcSh{to{background-position:-200% 0}}
+#plxStage.vc-listen .ctv-player-controls{opacity:0!important;transition:opacity .4s ease}
+#plxStage.vc-listen .ctv-player{transform:scale(var(--S));border-radius:52px;overflow:hidden}
+#plxStage.vc-listen .lsN,#plxStage.vc-listen #lsDots{opacity:1}
+#plxStage.vc-listen #pkO{opacity:0!important}
+#plxStage.vc-take .ctv-player-controls{opacity:0!important;pointer-events:none}
+#plxStage.vc-take #lsBack,#plxStage.vc-take #lsBanner,#plxStage.vc-take #lsToast{opacity:0!important}
+/* result takeover */
+#vcR{position:absolute;inset:0;z-index:51;opacity:0;visibility:hidden;transition:opacity .8s cubic-bezier(.3,.7,.2,1),visibility 0s linear .8s;background:#07080e;overflow:hidden}
+#vcR.on{opacity:1;visibility:visible;transition:opacity .8s cubic-bezier(.3,.7,.2,1)}
+#vcR .bgv{position:absolute;inset:0;overflow:hidden}
+#vcR .bgv video,#vcR .bgv .fb{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#vcR .bgv .fb{background:#07080e url('image assets/voice/bg.png') center/cover no-repeat;transition:opacity .8s ease}
+#vcR.cin .bgv .fb{opacity:0}
+#vcR .bgv video{opacity:0;transition:opacity 1s ease .3s}
+#vcR.cin .bgv video.on{opacity:1}
+#vcR .scrim{position:absolute;inset:0;background:linear-gradient(90deg,rgba(7,8,14,.45) 0%,rgba(7,8,14,.2) 45%,rgba(7,8,14,0) 75%)}
+#vcR .body{position:absolute;left:160px;top:210px;display:flex;gap:84px;align-items:flex-start}
+#vcR .pz{width:420px;height:630px;flex:none;border-radius:34px;overflow:hidden;background:#12151f;box-shadow:0 40px 100px rgba(0,0,0,.7),inset 0 0 0 2px rgba(255,255,255,.14);opacity:0;transform:translateY(40px) scale(.9);transition:opacity .7s ease .25s,transform .9s cubic-bezier(.2,.8,.2,1) .25s}
+#vcR .pz img{width:100%;height:100%;object-fit:cover;display:block}
+#vcR .in{width:900px;padding-top:30px}
+#vcR .in>*{opacity:0;transform:translateY(22px);transition:opacity .6s ease,transform .8s cubic-bezier(.2,.8,.2,1)}
+#vcR.on .pz{opacity:1;transform:none}
+#vcR.on .in>*{opacity:1;transform:none}
+#vcR.on .in>:nth-child(1){transition-delay:.5s}#vcR.on .in>:nth-child(2){transition-delay:.62s}#vcR.on .in>:nth-child(3){transition-delay:.74s}#vcR.on .in>:nth-child(4){transition-delay:.86s}#vcR.on .in>:nth-child(5){transition-delay:1s}
+#vcR .kick{font-size:26px;font-weight:600;color:#c8ccdf;letter-spacing:.02em}
+#vcR .t{margin-top:14px;font-size:112px;font-weight:700;line-height:1;letter-spacing:-.02em}
+#vcR .m{margin-top:20px;font-size:22px;line-height:1.35;color:#c8ccdf}
+#vcR .l{margin-top:26px;font-size:30px;line-height:1.35;color:rgba(250,251,255,.92);max-width:760px}
+#vcR .cta{margin-top:54px;display:flex;gap:24px;align-items:center;height:80px}
+#vcR .b{display:flex;align-items:center;justify-content:center;height:64px;min-width:64px;padding:0 16px;border-radius:500px;background:rgba(255,255,255,.15);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);color:#fafbff;font-size:28px;font-weight:600;letter-spacing:.28px;white-space:nowrap;transition:height .4s cubic-bezier(.2,.8,.2,1),padding .4s cubic-bezier(.2,.8,.2,1),background .3s ease,color .3s ease}
+#vcR .b .ic{width:32px;height:32px;flex:none;transition:width .4s cubic-bezier(.2,.8,.2,1),height .4s cubic-bezier(.2,.8,.2,1)}
+#vcR .b .ic svg{width:100%;height:100%;display:block}
+#vcR .b .lb{max-width:0;opacity:0;margin-left:0;overflow:hidden;transition:max-width .45s cubic-bezier(.2,.8,.2,1),opacity .3s ease,margin-left .45s cubic-bezier(.2,.8,.2,1);line-height:1.25}
+#vcR .b.f{height:80px;padding:0 32px;background:#fafbff;color:#06070a}
+#vcR .b.f .ic{width:40px;height:40px}
+#vcR .b.f .lb{max-width:260px;opacity:1;margin-left:12px}
+#vcR .b.on:not(.f) .ic{color:#ff5a3c}
+#vcR .bkh{position:absolute;right:120px;top:90px;display:flex;align-items:center;gap:12px;height:56px;padding:0;font-size:24px;font-weight:600;color:#fafbff;opacity:0;transition:opacity .6s ease .6s}
+#vcR .bkh svg{width:28px;height:28px}
+#vcR.on .bkh{opacity:1}
+#vcR .det{position:absolute;left:664px;top:240px;width:900px;opacity:0;visibility:hidden;transform:translateY(20px);transition:opacity .45s ease,transform .6s cubic-bezier(.2,.8,.2,1),visibility 0s linear .5s}
+#vcR.dt .det{opacity:1;visibility:visible;transform:none;transition:opacity .45s ease .15s,transform .6s cubic-bezier(.2,.8,.2,1) .15s}
+#vcR.dt .in{opacity:0;pointer-events:none}
+#vcR .det .dh{font-size:26px;font-weight:600;color:#c8ccdf}
+#vcR .det .dt1{margin-top:12px;font-size:72px;font-weight:700;line-height:1;letter-spacing:-.02em}
+#vcR .det .tag{margin-top:14px;font-size:28px;color:#c8ccdf;font-style:italic}
+#vcR .det dl{margin:36px 0 0;display:grid;grid-template-columns:200px 1fr;gap:18px 24px;font-size:28px;line-height:1.35}
+#vcR .det dt{color:#a2a7c0}#vcR .det dd{margin:0;color:#fafbff}
+#vcR.cin .body{opacity:0;pointer-events:none;transition:opacity .5s ease}
+#vcR.cin .scrim{opacity:.15;transition:opacity .6s ease}
+#vcR .scrim{transition:opacity .6s ease}
+
+/* voice-launched playback: no keyboard hint, no 'Mini guide' tooltip */
+#playerHint{display:none!important}
+#plxStage.vc-nohint .plx-tooltip{display:none!important}
+#plxStage.vc-nohint .ctv-player-icon-btn.focused{background:rgba(255,255,255,.14);color:var(--pl-text);transform:none}
+#vcRemote .rwrap{width:270px;flex:none;display:flex;flex-direction:column;align-items:center;gap:22px;transform-origin:center center}
+/* search bar prompt (chosen) */
+#vcL .cap{bottom:120px}
+#vcL .pill{width:1120px!important;max-width:none;border-radius:48px;min-height:96px;background:rgba(14,16,26,.5);-webkit-backdrop-filter:blur(40px);backdrop-filter:blur(40px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);transform:translateY(16px) scale(.96)}
+#vcL.on .pill{transform:none}
+#vcL .pill::before,#vcL .pill::after{display:none}
+#vcL .pill .ic{width:96px;height:96px}
+#vcL .pill .tx{flex:1 1 auto;opacity:1!important;font-size:38px!important;line-height:96px;height:96px;margin-right:36px}
+#vcL .pill .tx:empty::before{content:'Ask Fubo anything\2026';color:#8d93ad;font-weight:500}
+#vcL .dim{background:linear-gradient(0deg,rgba(6,7,12,.3),rgba(6,7,12,0) 44%)}
+
+/* ===== peek: wider strips + channel tile that sticks to the player edge ===== */
+#plxStage{--S:.88;--L:115px;--k:.978}
+#plxStage.ls-peek .ctv-player{transform:scale(var(--S));border-radius:52px;overflow:hidden}
+#lsNL{left:calc(var(--L) - 16px - 1728px);transform:scale(var(--k))}
+#lsNR{left:calc(1920px - var(--L) + 16px);transform:scale(var(--k))}
+.lsN .logo{display:none}
+#pkO{position:absolute;inset:0;z-index:35;pointer-events:none;opacity:0;transition:opacity .45s ease}
+#plxStage.ls-peek #pkO{opacity:1}
+.pkI{position:absolute;top:50%;width:132px;height:132px;transform:translateY(-50%);display:flex;flex-direction:row;gap:0;align-items:center;justify-content:center;border-radius:38px;background:rgba(22,24,38,.62);-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.2),0 10px 30px rgba(0,0,0,.35)}
+.pkI.l{flex-direction:row-reverse}
+.pkI img{display:block;width:84px;height:84px;object-fit:contain}
+.pkI.l svg{margin-right:-14px}.pkI.r svg{margin-left:-14px}
+.pkI svg{width:26px;height:26px;flex:none;color:rgba(250,251,255,.45)}
+#plxStage.lsg #pkO{opacity:0!important;transition:opacity .12s ease}
+#pkO .l{left:calc(var(--L) - 66px)}#pkO .r{right:calc(var(--L) - 66px)}
+
+/* variant B: thumbnail of what's next + channel tab (same 132px tile) */
+.pkth,.pkct{display:none}
+#plxStage:is([data-pkv="b"],[data-pkv="c"]) .pkI{display:block;overflow:hidden;background:#161822;border-radius:16px;-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:inset 0 0 0 2px #14161f,0 10px 30px rgba(0,0,0,.35)}
+#plxStage:is([data-pkv="b"],[data-pkv="c"]) .pkI>img{display:none}
+#plxStage:is([data-pkv="b"],[data-pkv="c"]) .pkth{display:block;position:absolute;inset:0;background:var(--im) center 20%/cover no-repeat}
+#plxStage:is([data-pkv="b"],[data-pkv="c"]) .pkct{display:flex;position:absolute;left:0;right:0;bottom:0;height:50px;background:#14161f;border-radius:50% 50% 0 0/72% 72% 0 0;align-items:center;justify-content:center}
+#plxStage:is([data-pkv="b"],[data-pkv="c"]) .pkct img{display:block;height:46px;width:auto;max-width:82px;object-fit:contain;margin-top:2px}
+#plxStage:is([data-pkv="b"],[data-pkv="c"]) .pkI svg{display:none!important}
+#plxStage:is([data-pkv="b"],[data-pkv="c"]) .pkI::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 2px #14161f;pointer-events:none}
+.pkfull{display:none}
+#plxStage[data-pkv="c"] .pkI.has-tile{background:none;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+#plxStage[data-pkv="c"] .pkI.has-tile .pkfull{display:block;position:absolute;inset:0;z-index:3;background:var(--tl) center/100% 100% no-repeat}
+#plxStage[data-pkv="c"] .pkI.has-tile::after{display:none}
+#plxStage[data-pkv="c"] .pkI{width:176px;height:176px}
+#plxStage[data-pkv="c"] #pkO .l{left:calc(var(--L) - 88px)}
+#plxStage[data-pkv="c"] #pkO .r{right:calc(var(--L) - 88px)}
+#plxStage.vc-take #pkO{opacity:0!important}
+#vcL .glow{left:var(--L);right:var(--L);top:calc((1080px - 1080px*var(--S))/2);bottom:calc((1080px - 1080px*var(--S))/2);border-radius:50px}
+/* ===== in-game moment: lower-third offer with a shrinking top border ===== */
+#gmN{position:absolute;right:72px;top:72px;width:max-content;max-width:720px;z-index:36;opacity:0;transform:translateY(-24px);visibility:hidden;pointer-events:none;border:0;border-radius:24px;background:rgba(10,12,20,.62);-webkit-backdrop-filter:blur(32px) saturate(140%);backdrop-filter:blur(32px) saturate(140%);transition:opacity .45s ease,transform .6s cubic-bezier(.2,.8,.2,1),visibility 0s linear .6s}
+#gmN.on{opacity:1;transform:none;visibility:visible;transition:opacity .45s ease,transform .6s cubic-bezier(.2,.8,.2,1)}
+#gmN .gt{position:absolute;left:30px;right:30px;top:0;height:4px}
+#gmN .gt i{display:block;height:100%;border-radius:3px;background:#fafbff;transform-origin:0 50%}
+#gmN.on:not(.ok) .gt i{animation:gmT 20s linear forwards}
+#gmN.ok .gt{display:none}
+@keyframes gmT{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+#gmN .gb{display:flex;gap:28px;align-items:center;padding:36px 40px 36px 36px}
+#gmN .gi{flex:none;width:142px;height:142px;border-radius:30px;overflow:hidden}
+#gmN .gi img{display:block;width:100%;height:100%;object-fit:cover}
+#gmN .gk{display:none;font-size:18px;font-weight:600;color:#a2a7c0;letter-spacing:.02em}
+#gmN .gk b{color:#fafbff;font-weight:700}
+#gmN .gh{margin-top:0;font-size:34px;font-weight:700;line-height:1.1;letter-spacing:-.01em;color:#fafbff}
+#gmN .gp{margin-top:6px;font-size:22px;line-height:1.3;color:#c8ccdf}
+#gmN .gc{margin-top:18px;display:flex;gap:12px}
+#gmN .gbt{height:52px;padding:0 24px;display:flex;align-items:center;border-radius:500px;background:rgba(255,255,255,.14);font-size:20px;font-weight:600;color:#fafbff;white-space:nowrap;transition:background .2s ease,color .2s ease}
+#gmN .gbt.f{background:#fafbff;color:#06070a}
+#vcRemote .gmb{all:unset;cursor:pointer;box-sizing:border-box;padding:9px 18px;border-radius:500px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);color:#fafbff;font-weight:600;font-size:13px;text-align:center;transition:background .15s}
+#vcRemote .gmb:hover{background:rgba(255,255,255,.18)}
+#gmBar{position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:100000;padding:4px;border-radius:500px;background:rgba(20,22,32,.85);border:1px solid rgba(255,255,255,.12);font:600 12px -apple-system,BlinkMacSystemFont,sans-serif}
+#gmBar button{all:unset;cursor:pointer;padding:6px 14px;border-radius:500px;color:#fafbff;white-space:nowrap}
+
+/* ===== result as a context card over the playing video ===== */
+#vcR{background:transparent;pointer-events:none}
+#vcR.cin{background:#07080e}
+#vcR .bgv{display:none}
+#vcR.cin .bgv{display:block}
+#vcR .scrim{display:none}
+#vcR .body{left:auto;right:40px;top:40px;bottom:40px;width:580px;box-sizing:border-box;display:flex;flex-direction:column;align-items:stretch;gap:0;padding:40px;border-radius:24px;background:rgba(10,12,20,.8);-webkit-backdrop-filter:blur(40px) saturate(140%);backdrop-filter:blur(40px) saturate(140%);pointer-events:auto;opacity:0;transform:translateY(-24px);transition:opacity .45s ease,transform .6s cubic-bezier(.2,.8,.2,1)}
+#vcR.on .body{opacity:1;transform:none}
+#vcR.on.cin .body{opacity:0;pointer-events:none}
+#vcR .hd{display:flex;flex-direction:column-reverse;align-items:stretch;gap:12px;margin-bottom:32px}
+#vcR .kick{font-size:20px;font-weight:400;color:#a2a7c0;letter-spacing:.01em}
+#vcR .bkh{position:static;align-self:flex-end;width:auto;margin:0;box-sizing:border-box;justify-content:flex-end;height:44px;padding:0;display:flex;align-items:center;gap:10px;font-size:20px;font-weight:600;color:#fafbff;opacity:0;cursor:pointer;pointer-events:auto;transition:opacity .5s ease .5s}
+#vcR.on .bkh{opacity:1}
+#vcR .bkh svg{width:26px;height:26px}
+#vcR .top{display:flex;gap:28px;align-items:flex-start}
+#vcR .pz{width:210px;height:315px;flex:none;border-radius:18px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.12);opacity:1;transform:none;transition:none}
+#vcR .ti{min-width:0;padding-top:4px}
+#vcR .t{font-size:54px;font-weight:700;line-height:1.04;letter-spacing:-.02em;margin:0;overflow-wrap:anywhere}
+#vcR .m{margin-top:16px;font-size:20px;line-height:1.35;color:#fafbff}
+#vcR .cs{margin-top:10px;font-size:18px;line-height:1.4;color:#a2a7c0}
+#vcR .l{margin-top:32px;font-size:22px;line-height:1.45;color:rgba(250,251,255,.9);max-width:none;opacity:1;transform:none;transition:none}
+#vcR .cta{margin:32px 0 0;padding:0;border-top:0;height:auto;display:flex;gap:12px;align-items:center;opacity:1;transform:none;transition:none}
+#vcR .b{height:52px;min-width:52px;padding:0 12px;font-size:22px}
+#vcR .b .ic{width:26px;height:26px}
+#vcR .b.f{height:64px;padding:0 26px}
+#vcR .b.f .ic{width:30px;height:30px}
+#vcR .b.f .lb{max-width:220px;margin-left:10px}
+#vcR .kick,#vcR .m,#vcR .cs{display:none}
+#vcR .hd{margin-bottom:20px}
+#vcR .top{display:flex;flex-direction:column;gap:22px;flex:1;min-height:0}
+#vcR .pz{width:100%;height:auto;flex:1;min-height:0}
+#vcR .pz img{object-position:center 22%}
+#vcR .ti{padding-top:0}
+#vcR .t{font-size:44px}
+#vcR .l{margin-top:20px}
+#vcR .det{left:40px;right:40px;top:108px;bottom:40px;width:auto}
+#vcR .det .dh{font-size:20px;color:#a2a7c0}
+#vcR .det .dt1{margin-top:8px;font-size:48px}
+#vcR .det .tag{margin-top:10px;font-size:20px}
+#vcR .det dl{margin-top:26px;grid-template-columns:110px 1fr;gap:14px 16px;font-size:20px}
+#lsG .gc .pvv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .6s ease;pointer-events:none}
+#lsG .gc .pvv.on{opacity:1}
+</style></head><body>
+<div id="stage">
+<nav class="ctv-navbar" id="ctvNavbar">
+  <div class="ctv-nav-profile" id="navProfile">
+    <div class="ctv-nav-profile-avatar"></div>
+    <span class="ctv-nav-profile-name">Thaymisan</span>
+  </div>
+  <div class="ctv-nav-items" id="navItems">
+    <div class="ctv-nav-item" data-page="search">
+      <svg class="icon-outline" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21.7748 20.6875L16.9656 15.8793C18.3595 14.2058 19.0546 12.0594 18.9062 9.88649C18.7579 7.7136 17.7775 5.68155 16.1691 4.21306C14.5607 2.74457 12.448 1.9527 10.2707 2.00219C8.09327 2.05167 6.01878 2.9387 4.47874 4.47874C2.9387 6.01878 2.05167 8.09327 2.00219 10.2707C1.9527 12.448 2.74457 14.5607 4.21306 16.1691C5.68155 17.7775 7.7136 18.7579 9.88649 18.9062C12.0594 19.0546 14.2058 18.3595 15.8793 16.9656L20.6875 21.7748C20.7589 21.8462 20.8437 21.9028 20.937 21.9415C21.0302 21.9801 21.1302 22 21.2312 22C21.3321 22 21.4321 21.9801 21.5254 21.9415C21.6187 21.9028 21.7034 21.8462 21.7748 21.7748C21.8462 21.7034 21.9028 21.6187 21.9415 21.5254C21.9801 21.4321 22 21.3321 22 21.2312C22 21.1302 21.9801 21.0302 21.9415 20.937C21.9028 20.8437 21.8462 20.7589 21.7748 20.6875ZM3.55803 10.4736C3.55803 9.10583 3.96362 7.76878 4.72351 6.63151C5.4834 5.49425 6.56347 4.60787 7.82713 4.08444C9.09078 3.56102 10.4813 3.42407 11.8228 3.69091C13.1643 3.95775 14.3965 4.61639 15.3637 5.58355C16.3308 6.55071 16.9895 7.78295 17.2563 9.12444C17.5231 10.4659 17.3862 11.8564 16.8628 13.1201C16.3393 14.3837 15.453 15.4638 14.3157 16.2237C13.1784 16.9836 11.8414 17.3892 10.4736 17.3892C8.6401 17.3872 6.88228 16.6579 5.5858 15.3614C4.28932 14.0649 3.56006 12.3071 3.55803 10.4736Z" fill="currentColor"/></svg>
+      <svg class="icon-filled" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.4738 15.0841C13.02 15.0841 15.0841 13.02 15.0841 10.4738C15.0841 7.92752 13.02 5.86337 10.4738 5.86337C7.92752 5.86337 5.86337 7.92752 5.86337 10.4738C5.86337 13.02 7.92752 15.0841 10.4738 15.0841Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M16.9656 15.8793L21.7748 20.6875C21.8462 20.7589 21.9028 20.8437 21.9415 20.937C21.9801 21.0302 22 21.1302 22 21.2312C22 21.3321 21.9801 21.4321 21.9415 21.5254C21.9028 21.6187 21.8462 21.7034 21.7748 21.7748C21.7034 21.8462 21.6187 21.9028 21.5254 21.9415C21.4321 21.9801 21.3321 22 21.2312 22C21.1302 22 21.0302 21.9801 20.937 21.9415C20.8437 21.9028 20.7589 21.8462 20.6875 21.7748L15.8793 16.9656C14.2058 18.3595 12.0594 19.0546 9.88649 18.9062C7.7136 18.7579 5.68155 17.7775 4.21306 16.1691C2.74457 14.5607 1.9527 12.448 2.00219 10.2707C2.05167 8.09327 2.9387 6.01878 4.47874 4.47874C6.01878 2.9387 8.09327 2.05167 10.2707 2.00219C12.448 1.9527 14.5607 2.74457 16.1691 4.21306C17.7775 5.68155 18.7579 7.7136 18.9062 9.88649C19.0546 12.0594 18.3595 14.2058 16.9656 15.8793ZM4.72351 6.63151C3.96362 7.76878 3.55803 9.10583 3.55803 10.4736C3.56006 12.3071 4.28932 14.0649 5.5858 15.3614C6.88228 16.6579 8.6401 17.3872 10.4736 17.3892C11.8414 17.3892 13.1784 16.9836 14.3157 16.2237C15.453 15.4638 16.3393 14.3837 16.8628 13.1201C17.3862 11.8564 17.5231 10.4659 17.2563 9.12444C16.9895 7.78295 16.3308 6.55071 15.3637 5.58355C14.3965 4.61639 13.1643 3.95775 11.8228 3.69091C10.4813 3.42407 9.09078 3.56102 7.82713 4.08444C6.56347 4.60787 5.4834 5.49425 4.72351 6.63151Z" fill="currentColor"/></svg>
+      <span class="ctv-nav-item-label">Search</span>
+    </div>
+    <div class="ctv-nav-item active" data-page="home">
+      <svg class="icon-outline" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20.5153 9.57718L13.0153 2.40597C13.0116 2.40273 13.0082 2.39924 13.005 2.39552C12.7289 2.14102 12.369 2 11.9958 2C11.6225 2 11.2627 2.14102 10.9866 2.39552L10.9763 2.40597L3.48469 9.57718C3.33187 9.71958 3.20989 9.89259 3.12646 10.0852C3.04303 10.2779 2.99997 10.486 3 10.6964V19.4799C3 19.883 3.15804 20.2697 3.43934 20.5548C3.72064 20.8398 4.10218 21 4.5 21H9C9.39782 21 9.77936 20.8398 10.0607 20.5548C10.342 20.2697 10.5 19.883 10.5 19.4799V14.9195H13.5V19.4799C13.5 19.883 13.658 20.2697 13.9393 20.5548C14.2206 20.8398 14.6022 21 15 21H19.5C19.8978 21 20.2794 20.8398 20.5607 20.5548C20.842 20.2697 21 19.883 21 19.4799V10.6964C21 10.486 20.957 10.2779 20.8735 10.0852C20.7901 9.89259 20.6681 9.71958 20.5153 9.57718ZM19.5 19.4799H15V14.9195C15 14.5163 14.842 14.1297 14.5607 13.8446C14.2794 13.5595 13.8978 13.3994 13.5 13.3994H10.5C10.1022 13.3994 9.72064 13.5595 9.43934 13.8446C9.15804 14.1297 9 14.5163 9 14.9195V19.4799H4.5V10.6964L4.51031 10.6869L12 3.51851L19.4906 10.685L19.5009 10.6945L19.5 19.4799Z" fill="currentColor"/></svg>
+      <svg class="icon-filled" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 10.6964V19.4799C21 19.883 20.8419 20.2697 20.5606 20.5548C20.2793 20.8398 19.8978 21 19.5 21H15.75C15.3522 21 14.9706 20.8398 14.6893 20.5548C14.408 20.2697 14.25 19.883 14.25 19.4799V15.6795C14.25 15.478 14.171 15.2846 14.0303 15.1421C13.8897 14.9996 13.6989 14.9195 13.5 14.9195H10.5C10.3011 14.9195 10.1103 14.9996 9.96966 15.1421C9.82901 15.2846 9.74999 15.478 9.74999 15.6795V19.4799C9.74999 19.883 9.59196 20.2697 9.31065 20.5548C9.02935 20.8398 8.64782 21 8.24999 21H4.5C4.10217 21 3.72064 20.8398 3.43934 20.5548C3.15804 20.2697 3 19.883 3 19.4799V10.6964C2.99997 10.486 3.04303 10.2779 3.12646 10.0852C3.20989 9.89259 3.33187 9.71958 3.48469 9.57718L10.9847 2.40597L10.995 2.39552C11.2711 2.14102 11.631 2 12.0042 2C12.3775 2 12.7373 2.14102 13.0134 2.39552C13.0166 2.39924 13.0201 2.40273 13.0237 2.40597L20.5237 9.57718C20.675 9.72034 20.7954 9.89367 20.8774 10.0863C20.9593 10.2789 21.0011 10.4866 21 10.6964Z" fill="currentColor"/></svg>
+      <span class="ctv-nav-item-label">Home</span>
+    </div>
+    <div class="ctv-nav-item" data-page="guide">
+      <svg class="icon-outline" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M4.5 13.25H19.5C19.8978 13.25 20.2793 13.408 20.5606 13.6894C20.842 13.9706 21 14.3522 21 14.75V18.5C21 18.8978 20.842 19.2794 20.5606 19.5606C20.2793 19.842 19.8978 20 19.5 20H4.5C4.10216 20 3.72066 19.842 3.43936 19.5606C3.15802 19.2794 3 18.8978 3 18.5V14.75C3 14.3522 3.15802 13.9706 3.43936 13.6894C3.72066 13.408 4.10216 13.25 4.5 13.25ZM10.5 18.5H19.5V14.75H10.5V18.5ZM9 18.5V14.75H4.5V18.5H9Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M19.5 5C19.8978 5 20.2793 5.15802 20.5606 5.43936C20.842 5.72061 21 6.1022 21 6.5V10.25C21 10.6478 20.842 11.0294 20.5606 11.3106C20.2793 11.592 19.8978 11.75 19.5 11.75H4.5C4.10216 11.75 3.72066 11.592 3.43936 11.3106C3.15802 11.0294 3 10.6478 3 10.25V6.5C3 6.1022 3.15802 5.72061 3.43936 5.43936C3.72066 5.15802 4.10216 5 4.5 5H19.5ZM10.5 6.5H19.5V10.25H10.5V6.5ZM9 6.5H4.5V10.25H9V6.5Z" fill="currentColor"/></svg>
+      <svg class="icon-filled" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M19.5 5H4.5C3.67159 5 3 5.67154 3 6.5V10.25C3 11.0785 3.67159 11.75 4.5 11.75H19.5C20.3284 11.75 21 11.0785 21 10.25V6.5C21 5.67154 20.3284 5 19.5 5ZM19.5 6.5H10.5V10.25H19.5V6.5Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M19.5 13.25H4.5C3.67159 13.25 3 13.9215 3 14.75V18.5C3 19.3285 3.67159 20 4.5 20H19.5C20.3284 20 21 19.3285 21 18.5V14.75C21 13.9215 20.3284 13.25 19.5 13.25ZM19.5 14.75H10.5V18.5H19.5V14.75Z" fill="currentColor"/></svg>
+      <span class="ctv-nav-item-label">Guide</span>
+    </div>
+    <div class="ctv-nav-item" data-page="mystuff">
+      <svg class="icon-outline" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.75 3C9.33579 3 9 3.33579 9 3.75C9 4.16421 9.33579 4.5 9.75 4.5H14.25C14.6642 4.5 15 4.16421 15 3.75C15 3.33579 14.6642 3 14.25 3H9.75Z" fill="currentColor"/><path d="M6 6.75C6 6.33579 6.33579 6 6.75 6H17.25C17.6642 6 18 6.33579 18 6.75C18 7.16421 17.6642 7.5 17.25 7.5H6.75C6.33579 7.5 6 7.16421 6 6.75Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M5.25 9C4.00736 9 3 10.0074 3 11.25V18.75C3 19.9926 4.00736 21 5.25 21H18.75C19.9926 21 21 19.9926 21 18.75V11.25C21 10.0074 19.9926 9 18.75 9H5.25ZM18.75 10.5H5.25C4.83579 10.5 4.5 10.8358 4.5 11.25V18.75C4.5 19.1642 4.83579 19.5 5.25 19.5H18.75C19.1642 19.5 19.5 19.1642 19.5 18.75V11.25C19.5 10.8358 19.1642 10.5 18.75 10.5Z" fill="currentColor"/></svg>
+      <svg class="icon-filled" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9.75 3C9.33579 3 9 3.33579 9 3.75C9 4.16421 9.33579 4.5 9.75 4.5H14.25C14.6642 4.5 15 4.16421 15 3.75C15 3.33579 14.6642 3 14.25 3H9.75Z" fill="currentColor"/><path d="M6 6.75C6 6.33579 6.33579 6 6.75 6H17.25C17.6642 6 18 6.33579 18 6.75C18 7.16421 17.6642 7.5 17.25 7.5H6.75C6.33579 7.5 6 7.16421 6 6.75Z" fill="currentColor"/><path d="M3 11.25C3 10.0074 4.00736 9 5.25 9H18.75C19.9926 9 21 10.0074 21 11.25V18.75C21 19.9926 19.9926 21 18.75 21H5.25C4.00736 21 3 19.9926 3 18.75V11.25Z" fill="currentColor"/></svg>
+      <span class="ctv-nav-item-label">My Stuff</span>
+    </div>
+    <div class="ctv-nav-item" data-page="sports">
+      <svg class="icon-outline" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22.4667 5.25H20.1667V4.5C20.1667 4.10218 20.0051 3.72064 19.7176 3.43934C19.43 3.15804 19.04 3 18.6333 3H6.36667C5.96 3 5.56999 3.15804 5.28244 3.43934C4.99488 3.72064 4.83333 4.10218 4.83333 4.5V5.25H2.53333C2.12667 5.25 1.73666 5.40804 1.4491 5.68934C1.16155 5.97064 1 6.35218 1 6.75V8.25C1 9.24456 1.40387 10.1984 2.12276 10.9017C2.47872 11.2499 2.9013 11.5261 3.36638 11.7145C3.83146 11.903 4.32993 12 4.83333 12H5.18313C5.63474 13.4001 6.49582 14.64 7.65994 15.5666C8.82406 16.4931 10.2402 17.0657 11.7333 17.2134V19.5H9.43333C9.23 19.5 9.035 19.579 8.89122 19.7197C8.74744 19.8603 8.66667 20.0511 8.66667 20.25C8.66667 20.4489 8.74744 20.6397 8.89122 20.7803C9.035 20.921 9.23 21 9.43333 21H15.5667C15.77 21 15.965 20.921 16.1088 20.7803C16.2526 20.6397 16.3333 20.4489 16.3333 20.25C16.3333 20.0511 16.2526 19.8603 16.1088 19.7197C15.965 19.579 15.77 19.5 15.5667 19.5H13.2667V17.2106C16.3276 16.9078 18.8672 14.8069 19.791 12H20.1667C21.1833 12 22.1584 11.6049 22.8772 10.9017C23.5961 10.1984 24 9.24456 24 8.25V6.75C24 6.35218 23.8385 5.97064 23.5509 5.68934C23.2633 5.40804 22.8733 5.25 22.4667 5.25ZM4.83333 10.5C4.22334 10.5 3.63832 10.2629 3.20699 9.84099C2.77565 9.41903 2.53333 8.84674 2.53333 8.25V6.75H4.83333V9.75C4.83333 10 4.84579 10.25 4.87071 10.5H4.83333ZM18.6333 9.66562C18.6333 12.9956 15.903 15.7256 12.547 15.75H12.5C10.8733 15.75 9.3133 15.1179 8.16308 13.9926C7.01285 12.8674 6.36667 11.3413 6.36667 9.75V4.5H18.6333V9.66562ZM22.4667 8.25C22.4667 8.84674 22.2243 9.41903 21.793 9.84099C21.3617 10.2629 20.7767 10.5 20.1667 10.5H20.1187C20.1502 10.2229 20.1662 9.9444 20.1667 9.66562V6.75H22.4667V8.25Z" fill="currentColor"/></svg>
+      <svg class="icon-filled" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22.4667 5.25H20.1667V4.5C20.1667 4.10218 20.0051 3.72064 19.7176 3.43934C19.43 3.15804 19.04 3 18.6333 3H6.36667C5.96 3 5.56999 3.15804 5.28244 3.43934C4.99488 3.72064 4.83333 4.10218 4.83333 4.5V5.25H2.53333C2.12667 5.25 1.73666 5.40804 1.4491 5.68934C1.16155 5.97064 1 6.35218 1 6.75V8.25C1 9.24456 1.40387 10.1984 2.12276 10.9017C2.47872 11.2499 2.9013 11.5261 3.36638 11.7145C3.83146 11.903 4.32993 12 4.83333 12H5.18313C5.63474 13.4001 6.49582 14.64 7.65994 15.5666C8.82406 16.4931 10.2402 17.0657 11.7333 17.2134V19.5H9.43333C9.23 19.5 9.035 19.579 8.89122 19.7197C8.74744 19.8603 8.66667 20.0511 8.66667 20.25C8.66667 20.4489 8.74744 20.6397 8.89122 20.7803C9.035 20.921 9.23 21 9.43333 21H15.5667C15.77 21 15.965 20.921 16.1088 20.7803C16.2526 20.6397 16.3333 20.4489 16.3333 20.25C16.3333 20.0511 16.2526 19.8603 16.1088 19.7197C15.965 19.579 15.77 19.5 15.5667 19.5H13.2667V17.2106C16.3276 16.9078 18.8672 14.8069 19.791 12H20.1667C21.1833 12 22.1584 11.6049 22.8772 10.9017C23.5961 10.1984 24 9.24456 24 8.25V6.75C24 6.35218 23.8385 5.97064 23.5509 5.68934C23.2633 5.40804 22.8733 5.25 22.4667 5.25ZM4.83333 10.5C4.22334 10.5 3.63832 10.2629 3.20699 9.84099C2.77565 9.41903 2.53333 8.84674 2.53333 8.25V6.75H4.83333V9.75C4.83333 10 4.84579 10.25 4.87071 10.5H4.83333ZM22.4667 8.25C22.4667 8.84674 22.2243 9.41903 21.793 9.84099C21.3617 10.2629 20.7767 10.5 20.1667 10.5H20.1187C20.1502 10.2229 20.1662 9.9444 20.1667 9.66562V6.75H22.4667V8.25Z" fill="currentColor"/></svg>
+      <span class="ctv-nav-item-label">Sports</span>
+    </div>
+    <div class="ctv-nav-item" data-page="shows">
+      <svg class="icon-outline" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.8885 6.87562L15.5038 9.87562C15.6094 9.94409 15.6959 10.0369 15.7557 10.1458C15.8156 10.2548 15.8469 10.3764 15.8469 10.5C15.8469 10.6236 15.8156 10.7452 15.7557 10.8542C15.6959 10.9631 15.6094 11.0559 15.5038 11.1244L10.8885 14.1244C10.7726 14.1998 10.6379 14.243 10.4988 14.2496C10.3596 14.2562 10.2213 14.2258 10.0985 14.1617C9.97567 14.0976 9.87302 14.0022 9.80149 13.8856C9.72995 13.7691 9.69222 13.6358 9.69231 13.5V7.5C9.69222 7.36419 9.72995 7.2309 9.80149 7.11436C9.87302 6.99782 9.97567 6.90241 10.0985 6.83831C10.2213 6.77421 10.3596 6.74382 10.4988 6.75039C10.6379 6.75696 10.7726 6.80025 10.8885 6.87562Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M4.30769 3H19.6923C20.3043 3 20.8913 3.23705 21.3241 3.65901C21.7569 4.08097 22 4.65326 22 5.25V15.75C22 16.3467 21.7569 16.919 21.3241 17.341C20.8913 17.7629 20.3043 18 19.6923 18H4.30769C3.69565 18 3.10868 17.7629 2.67591 17.341C2.24313 16.919 2 16.3467 2 15.75V5.25C2 4.65326 2.24313 4.08097 2.67591 3.65901C3.10868 3.23705 3.69565 3 4.30769 3ZM20.2362 16.2803C20.3805 16.1397 20.4615 15.9489 20.4615 15.75V5.25C20.4615 5.05109 20.3805 4.86032 20.2362 4.71967C20.092 4.57902 19.8963 4.5 19.6923 4.5H4.30769C4.10368 4.5 3.90802 4.57902 3.76376 4.71967C3.61951 4.86032 3.53846 5.05109 3.53846 5.25V15.75C3.53846 15.9489 3.61951 16.1397 3.76376 16.2803C3.90802 16.421 4.10368 16.5 4.30769 16.5H19.6923C19.8963 16.5 20.092 16.421 20.2362 16.2803Z" fill="currentColor"/><path d="M15.6209 20.7803C15.7651 20.6397 15.8462 20.4489 15.8462 20.25C15.8462 20.0511 15.7651 19.8603 15.6209 19.7197C15.4766 19.579 15.2809 19.5 15.0769 19.5H8.92308C8.71906 19.5 8.52341 19.579 8.37915 19.7197C8.23489 19.8603 8.15385 20.0511 8.15385 20.25C8.15385 20.4489 8.23489 20.6397 8.37915 20.7803C8.52341 20.921 8.71906 21 8.92308 21H15.0769C15.2809 21 15.4766 20.921 15.6209 20.7803Z" fill="currentColor"/></svg>
+      <svg class="icon-filled" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.8462 20.25C15.8462 20.4489 15.7651 20.6397 15.6209 20.7803C15.4766 20.921 15.2809 21 15.0769 21H8.92308C8.71906 21 8.52341 20.921 8.37915 20.7803C8.23489 20.6397 8.15385 20.4489 8.15385 20.25C8.15385 20.0511 8.23489 19.8603 8.37915 19.7197C8.52341 19.579 8.71906 19.5 8.92308 19.5H15.0769C15.2809 19.5 15.4766 19.579 15.6209 19.7197C15.7651 19.8603 15.8462 20.0511 15.8462 20.25ZM22 5.25V15.75C22 16.3467 21.7569 16.919 21.3241 17.341C20.8913 17.7629 20.3043 18 19.6923 18H4.30769C3.69565 18 3.10868 17.7629 2.67591 17.341C2.24313 16.919 2 16.3467 2 15.75V5.25C2 4.65326 2.24313 4.08097 2.67591 3.65901C3.10868 3.23705 3.69565 3 4.30769 3H19.6923C20.3043 3 20.8913 3.23705 21.3241 3.65901C21.7569 4.08097 22 4.65326 22 5.25ZM15.4615 10.5C15.4615 10.3738 15.4288 10.2496 15.3664 10.139C15.3041 10.0284 15.2141 9.93488 15.1048 9.86719L10.874 7.24219C10.7577 7.17015 10.6238 7.12989 10.486 7.12561C10.3483 7.12133 10.212 7.15319 10.0912 7.21786C9.97047 7.28252 9.86974 7.37762 9.79957 7.49322C9.72939 7.60882 9.69235 7.74067 9.69231 7.875V13.125C9.69235 13.2593 9.72939 13.3912 9.79957 13.5068C9.86974 13.6224 9.97047 13.7175 10.0912 13.7821C10.212 13.8468 10.3483 13.8787 10.486 13.8744C10.6238 13.8701 10.7577 13.8298 10.874 13.7578L15.1048 11.1328C15.2141 11.0651 15.3041 10.9716 15.3664 10.861C15.4288 10.7504 15.4615 10.6262 15.4615 10.5Z" fill="currentColor"/></svg>
+      <span class="ctv-nav-item-label">Shows</span>
+    </div>
+    <div class="ctv-nav-item" data-page="movies">
+      <svg class="icon-outline" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21.24 10.4994H10.4192L20.6701 7.82835C20.7671 7.80311 20.8581 7.75916 20.9378 7.69904C21.0176 7.63891 21.0845 7.56379 21.1346 7.47803C21.1848 7.39226 21.2172 7.29753 21.2301 7.19932C21.243 7.1011 21.236 7.00134 21.2096 6.9058L20.4345 4.09314C20.3278 3.71474 20.0744 3.39304 19.7291 3.19773C19.3838 3.00242 18.9744 2.94922 18.5897 3.04965L4.12295 6.8186C3.93033 6.86795 3.74962 6.95473 3.5914 7.07386C3.43318 7.19299 3.30063 7.34208 3.20151 7.51239C3.10183 7.68062 3.03743 7.8669 3.01214 8.06017C2.98685 8.25344 3.00117 8.44975 3.05426 8.63745L3.76102 11.2082C3.76102 11.2213 3.76102 11.2354 3.76102 11.2495V19.4999C3.76102 19.8978 3.92116 20.2793 4.2062 20.5606C4.49124 20.842 4.87783 21 5.28094 21H20.4801C20.8832 21 21.2698 20.842 21.5548 20.5606C21.8399 20.2793 22 19.8978 22 19.4999V11.2495C22 11.0505 21.9199 10.8598 21.7774 10.7191C21.6349 10.5785 21.4416 10.4994 21.24 10.4994ZM18.9754 4.4991L19.5453 6.56828L17.3966 7.13081L14.7253 5.60823L18.9754 4.4991ZM12.6402 6.14919L15.3114 7.67177L11.8023 8.58589L9.13107 7.06518L12.6402 6.14919ZM5.0976 10.3325L4.52763 8.26243L7.04499 7.60615L9.71624 9.1306L5.0976 10.3325ZM20.4801 19.4999H5.28094V11.9995H20.4801V19.4999Z" fill="currentColor"/></svg>
+      <svg class="icon-filled" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21.24 10.4994H10.4192L20.6701 7.82835C20.7671 7.80311 20.8581 7.75916 20.9378 7.69904C21.0176 7.63891 21.0845 7.56379 21.1346 7.47803C21.1848 7.39226 21.2172 7.29753 21.2301 7.19932C21.243 7.1011 21.236 7.00134 21.2096 6.9058L20.4345 4.09314C20.3278 3.71474 20.0744 3.39304 19.7291 3.19773C19.3838 3.00242 18.9744 2.94922 18.5897 3.04965L4.12295 6.8186C3.93033 6.86795 3.74962 6.95473 3.5914 7.07386C3.43318 7.19299 3.30063 7.34208 3.20151 7.51239C3.10183 7.68062 3.03743 7.8669 3.01214 8.06017C2.98685 8.25344 3.00117 8.44975 3.05426 8.63745L3.76102 11.2082C3.76102 11.2213 3.76102 11.2354 3.76102 11.2495V19.4999C3.76102 19.8978 3.92116 20.2793 4.2062 20.5606C4.49124 20.842 4.87783 21 5.28094 21H20.4801C20.8832 21 21.2698 20.842 21.5548 20.5606C21.8399 20.2793 22 19.8978 22 19.4999V11.2495C22 11.0505 21.9199 10.8598 21.7774 10.7191C21.6349 10.5785 21.4416 10.4994 21.24 10.4994ZM13.6823 5.87918L16.3545 7.40551L10.7593 8.8634L8.08803 7.33707L13.6823 5.87918Z" fill="currentColor"/></svg>
+      <span class="ctv-nav-item-label">Movies</span>
+    </div>
+  </div>
+  <div class="ctv-nav-logo">
+    <svg viewBox="0 0 283 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M31.19 0C14.76 0 2.02 10.35 0 26.59h18.71c1.53-6.8 6.63-10.84 13.22-10.84 4.6 0 7.73 1.53 9.72 4.56V0h.01zm0 80c16.43 0 29.17-10.35 31.19-26.59H43.67c-1.53 6.8-6.63 10.84-13.22 10.84-4.6 0-7.73-1.53-9.72-4.56V80h.46zm30.73-46.89V54.4c0 .52.01 1.03.03 1.54L80.5 55.9V33.11H61.92zM41.73 24.42v31.27c.02.57.03 1.15.03 1.73l18.55-.04V24.42H41.73zm113.47.46c-8.6 0-15.74 3.5-20.09 9.45V25.35h-17.56v49.34h18.09V50.53c0-8.35 5.25-13.75 12.67-13.75 7.16 0 11.67 4.92 11.67 12.25v25.66h18.09V46.34c0-13.22-9.14-21.46-22.87-21.46zm-58.12-.46v50.27h18.55V24.42H97.08zm89.14 0h38.21v14.8h-38.21v-14.8zm0 50.27h38.21V59.89h-38.21v14.8zm0-25.37h38.21V34.52h-38.21v14.8z" fill="#FF3A03"/></svg>
+  </div>
+  <div class="ctv-nav-flyout" id="navFlyout">
+    <div class="ctv-flyout-item selected" data-flyout="0"><div class="ctv-flyout-avatar" style="background: linear-gradient(135deg, #e87461, #c95a8a);"></div><span>Thaymisan</span></div>
+    <div class="ctv-flyout-item" data-flyout="1"><div class="ctv-flyout-avatar" style="background: linear-gradient(135deg, #7b68ee, #9370db);"></div><span>Sarah</span></div>
+    <div class="ctv-flyout-item" data-flyout="2"><div class="ctv-flyout-avatar" style="background: linear-gradient(135deg, #4da6ff, #7ec8e3);"></div><span>Aloysius</span></div>
+    <div class="ctv-flyout-divider"></div>
+    <div class="ctv-flyout-item" data-flyout="3"><svg viewBox="0 0 24 24" fill="none"><path d="M15.5 6a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0ZM12 11c-4 0-7 2.5-7 5v2h14v-2c0-2.5-3-5-7-5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Manage profiles</span></div>
+    <div class="ctv-flyout-item" data-flyout="4"><svg viewBox="0 0 24 24" fill="none"><path d="M21.807 10.001C21.786 9.893 21.743 9.79 21.68 9.7C21.617 9.611 21.536 9.536 21.442 9.482L18.646 7.848L18.635 4.616C18.634 4.504 18.611 4.395 18.565 4.294C18.519 4.193 18.452 4.103 18.37 4.031C17.355 3.151 16.187 2.477 14.927 2.044C14.828 2.01 14.723 1.997 14.619 2.007C14.514 2.017 14.413 2.049 14.322 2.101L11.501 3.718L8.677 2.098C8.586 2.046 8.485 2.013 8.38 2.003C8.276 1.993 8.17 2.006 8.071 2.04C6.812 2.476 5.645 3.153 4.632 4.035C4.55 4.107 4.483 4.196 4.437 4.297C4.391 4.398 4.368 4.507 4.367 4.619L4.353 7.853L1.557 9.488C1.463 9.542 1.382 9.617 1.319 9.706C1.256 9.796 1.213 9.898 1.192 10.007C0.936 11.326 0.936 12.683 1.192 14.002C1.213 14.11 1.256 14.213 1.319 14.302C1.382 14.392 1.463 14.466 1.557 14.521L4.353 16.155L4.364 19.388C4.365 19.499 4.388 19.609 4.434 19.71C4.48 19.811 4.547 19.901 4.63 19.972C5.644 20.852 6.812 21.527 8.072 21.959C8.171 21.994 8.276 22.007 8.38 21.997C8.485 21.987 8.586 21.955 8.677 21.903L11.501 20.281L14.324 21.901C14.436 21.965 14.562 21.998 14.69 21.997C14.772 21.997 14.853 21.983 14.931 21.957C16.19 21.521 17.356 20.845 18.37 19.964C18.452 19.892 18.519 19.803 18.565 19.702C18.61 19.601 18.634 19.491 18.635 19.38L18.649 16.146L21.445 14.511C21.539 14.457 21.62 14.382 21.683 14.293C21.746 14.203 21.789 14.101 21.81 13.992C22.064 12.675 22.063 11.318 21.807 10.001ZM11.501 15.845C10.759 15.845 10.034 15.619 9.418 15.197C8.801 14.774 8.32 14.174 8.037 13.471C7.753 12.768 7.679 11.995 7.823 11.249C7.968 10.503 8.325 9.818 8.849 9.28C9.374 8.743 10.042 8.377 10.769 8.228C11.497 8.08 12.251 8.156 12.936 8.447C13.621 8.738 14.207 9.231 14.619 9.863C15.031 10.496 15.251 11.239 15.251 11.999C15.251 13.019 14.856 13.997 14.152 14.718C13.449 15.44 12.495 15.845 11.501 15.845Z" fill="currentColor"/></svg><span>Settings</span></div>
+    <div class="ctv-flyout-item" data-flyout="5"><svg viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Link account</span></div>
+    <div class="ctv-flyout-item" data-flyout="6"><svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Sign out</span></div>
+    <div class="ctv-flyout-divider"></div>
+    <div class="ctv-flyout-version">App Version: 0.00.0<br>Player Version: 0.00.0</div>
+  </div>
+</nav>
+
+<div class="page" id="pageHome">
+  <div id="hero"><div id="hInfo">
+    <div class="fc-hero-flag" id="hFlag"></div><div class="fc-hero-title" id="hTitle"></div>
+    <div class="fc-hero-meta" id="hMeta"></div><div class="fc-hero-desc" id="hDesc"></div></div></div>
+  <div class="fc-clock" id="hClock">12:30pm</div>
+  <div id="feed"></div>
+</div>
+<div id="soon"></div>
+<div id="detail"><div class="fc-hero" id="dHero"><div class="fc-hero-info">
+  <div class="fc-hero-flag" id="dFlag"></div><div class="fc-hero-title" id="dTitle"></div>
+  <div class="fc-hero-meta" id="dMeta"></div><div class="fc-hero-desc" id="dDesc"></div>
+  <div class="fc-hero-actions">
+    <div class="fc-btn primary f" id="dPlay"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M18.75 12C18.7504 12.1959 18.703 12.3885 18.6122 12.5593C18.5214 12.73 18.3903 12.8729 18.2318 12.9742L8.40818 19.3302C8.24256 19.4374 8.05286 19.496 7.85869 19.4998C7.66451 19.5036 7.4729 19.4525 7.30364 19.3518C7.13598 19.2527 6.99632 19.1081 6.89902 18.9329C6.80172 18.7578 6.75028 18.5584 6.75 18.3552V5.64478C6.75028 5.44163 6.80172 5.24222 6.89902 5.06707C6.99632 4.89191 7.13598 4.74733 7.30364 4.64819C7.4729 4.54748 7.66451 4.49639 7.85869 4.5002C8.05286 4.504 8.24256 4.56256 8.40818 4.66982L18.2318 11.0258C18.3903 11.1271 18.5214 11.27 18.6122 11.4407C18.703 11.6115 18.7504 11.8041 18.75 12Z" fill="currentColor"/>
+</svg><span>Play</span></div>
+    <div class="fc-btn ghost" id="dList"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M21 12C21 12.1989 20.921 12.3897 20.7803 12.5303C20.6397 12.671 20.4489 12.75 20.25 12.75H12.75V20.25C12.75 20.4489 12.671 20.6397 12.5303 20.7803C12.3897 20.921 12.1989 21 12 21C11.8011 21 11.6103 20.921 11.4697 20.7803C11.329 20.6397 11.25 20.4489 11.25 20.25V12.75H3.75C3.55109 12.75 3.36032 12.671 3.21967 12.5303C3.07902 12.3897 3 12.1989 3 12C3 11.8011 3.07902 11.6103 3.21967 11.4697C3.36032 11.329 3.55109 11.25 3.75 11.25H11.25V3.75C11.25 3.55109 11.329 3.36032 11.4697 3.21967C11.6103 3.07902 11.8011 3 12 3C12.1989 3 12.3897 3.07902 12.5303 3.21967C12.671 3.36032 12.75 3.55109 12.75 3.75V11.25H20.25C20.4489 11.25 20.6397 11.329 20.7803 11.4697C20.921 11.6103 21 11.8011 21 12Z" fill="currentColor"/>
+</svg><span id="dListTxt">Add to Watchlist</span></div>
+  </div></div></div></div>
+<div class="fc-toast" id="toast">Done</div>
+</div>
+<div class="ctv-player-root" id="ctvPlayerRoot">
+<div id="plxStage">
+<div class="ctv-player" id="ctvPlayer">
+  <div class="ctv-player-bg" id="playerBg"></div>
+
+  <div class="ctv-player-controls" id="playerControls">
+    <div class="ctv-player-info" id="playerInfo">
+      <div class="ctv-player-badges">
+        <span class="pl-pill pl-live" id="badgeLive">LIVE</span>
+        <span class="pl-pill pl-rec" id="badgeRec" style="display:none">REC</span>
+        <span class="ctv-player-channel" id="channelLogo"></span>
+      </div>
+      <div class="ctv-player-title" id="playerTitle"></div>
+      <div class="ctv-player-meta" id="playerMeta"></div>
+    </div>
+
+    <div class="ctv-player-bottom" id="playerBottom">
+      <div class="ctv-player-actions">
+        <div class="ctv-player-actions-left">
+          <div class="ctv-player-pillbtn" data-action="startover" id="btnStartOver"><svg width="32" height="32" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M16.4983 4.70421L6.75 10.3497V6.37521C6.75 5.961 6.41421 5.62521 6 5.62521C5.58579 5.62521 5.25 5.961 5.25 6.37521V17.6252C5.25 18.0394 5.58579 18.3752 6 18.3752C6.41421 18.3752 6.75 18.0394 6.75 17.6252V13.6508L16.4983 19.2963C17.4983 19.8754 18.75 19.1538 18.75 17.9982V6.00225C18.75 4.84666 17.4983 4.12508 16.4983 4.70421ZM17.25 17.9982L6.89309 12.0002L17.25 6.00224L17.25 17.9982Z" fill="currentColor"/></svg> Start over</div>
+          <div class="ctv-player-pillbtn dimmed" data-action="golive" id="btnGoLive">Go to Live <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.50173 4.70421L17.25 10.3497V6.37521C17.25 5.961 17.5858 5.62521 18 5.62521C18.4142 5.62521 18.75 5.961 18.75 6.37521V17.6252C18.75 18.0394 18.4142 18.3752 18 18.3752C17.5858 18.3752 17.25 18.0394 17.25 17.6252V13.6508L7.50173 19.2963C6.50173 19.8754 5.25 19.1538 5.25 17.9982V6.00225C5.25 4.84666 6.50173 4.12508 7.50173 4.70421ZM6.75 17.9982L17.1069 12.0002L6.75 6.00224L6.75 17.9982Z" fill="currentColor"/></svg></div>
+        </div>
+        <div class="ctv-player-actions-right">
+          <div class="ctv-player-icon-btn" data-action="miniguide"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M11.25 18.3971V13.1029C11.25 12.908 11.095 12.75 10.9038 12.75H2.59615C2.40498 12.75 2.25 12.908 2.25 13.1029V18.3971C2.25 18.592 2.40498 18.75 2.59615 18.75H10.9038C11.095 18.75 11.25 18.592 11.25 18.3971ZM11.25 10.8971V5.60294C11.25 5.40802 11.095 5.25 10.9038 5.25H2.59615C2.40498 5.25 2.25 5.40802 2.25 5.60294V10.8971C2.25 11.092 2.40498 11.25 2.59615 11.25H10.9038C11.095 11.25 11.25 11.092 11.25 10.8971ZM21.4038 12.75H13.0962C12.905 12.75 12.75 12.908 12.75 13.1029V18.3971C12.75 18.592 12.905 18.75 13.0962 18.75H21.4038C21.595 18.75 21.75 18.592 21.75 18.3971V13.1029C21.75 12.908 21.595 12.75 21.4038 12.75ZM3.75 6.75V9.75H9.75V6.75H3.75ZM3.75 14.25V17.25H9.75V14.25H3.75ZM14.25 14.25V17.25H20.25V14.25H14.25ZM14.25 6.75V9.75H20.25V6.75H14.25ZM12.75 5.60294C12.75 5.40802 12.905 5.25 13.0962 5.25H21.4038C21.595 5.25 21.75 5.40802 21.75 5.60294V10.8971C21.75 11.092 21.595 11.25 21.4038 11.25H13.0962C12.905 11.25 12.75 11.092 12.75 10.8971V5.60294Z" fill="currentColor"/></svg><span class="plx-tooltip">Mini guide</span></div>
+          <div class="ctv-player-icon-btn" data-action="record"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M12 9C13.6568 9.00006 15 10.3432 15 12C15 13.6568 13.6568 14.9999 12 15C10.3432 15 9.00001 13.6569 9.00001 12C9.00001 10.3431 10.3432 9 12 9Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2.25C14.585 2.25276 17.0637 3.28054 18.8916 5.1084C20.7195 6.93628 21.7473 9.415 21.75 12C21.75 13.9284 21.1778 15.8136 20.1065 17.417C19.0352 19.0201 17.5128 20.2699 15.7315 21.0078C13.9499 21.7458 11.989 21.9387 10.0977 21.5625C8.20642 21.1863 6.469 20.258 5.10548 18.8945C3.74198 17.531 2.81375 15.7936 2.43751 13.9023C2.0613 12.011 2.25424 10.0501 2.99219 8.26855C3.73013 6.48718 4.97983 4.96483 6.58301 3.89355C8.18639 2.82221 10.0716 2.25 12 2.25ZM15.1572 4.37793C13.6498 3.75354 11.9909 3.58995 10.3906 3.9082C8.79031 4.22653 7.3198 5.01226 6.16602 6.16602C5.01224 7.3198 4.22654 8.79028 3.90821 10.3906C3.58992 11.9909 3.75353 13.6498 4.37794 15.1572C5.0023 16.6645 6.05954 17.9529 7.41602 18.8594C8.77273 19.7659 10.3683 20.25 12 20.25C14.1872 20.2475 16.2844 19.3777 17.8311 17.8311C19.3777 16.2844 20.2475 14.1872 20.25 12C20.25 10.3684 19.7658 8.77364 18.8594 7.41699C17.9529 6.06033 16.6647 5.00236 15.1572 4.37793Z" fill="currentColor"/></svg><span class="plx-tooltip">Record</span></div>
+          <div class="ctv-player-icon-btn" data-action="schedule"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M19.5 3H17.25V2.25C17.25 2.05109 17.171 1.86032 17.0303 1.71967C16.8897 1.57902 16.6989 1.5 16.5 1.5C16.3011 1.5 16.1103 1.57902 15.9697 1.71967C15.829 1.86032 15.75 2.05109 15.75 2.25V3H8.25V2.25C8.25 2.05109 8.17098 1.86032 8.03033 1.71967C7.88968 1.57902 7.69891 1.5 7.5 1.5C7.30109 1.5 7.11032 1.57902 6.96967 1.71967C6.82902 1.86032 6.75 2.05109 6.75 2.25V3H4.5C4.10218 3 3.72064 3.15804 3.43934 3.43934C3.15804 3.72064 3 4.10218 3 4.5V19.5C3 19.8978 3.15804 20.2794 3.43934 20.5607C3.72064 20.842 4.10218 21 4.5 21H19.5C19.8978 21 20.2794 20.842 20.5607 20.5607C20.842 20.2794 21 19.8978 21 19.5V4.5C21 4.10218 20.842 3.72064 20.5607 3.43934C20.2794 3.15804 19.8978 3 19.5 3ZM6.75 4.5V5.25C6.75 5.44891 6.82902 5.63968 6.96967 5.78033C7.11032 5.92098 7.30109 6 7.5 6C7.69891 6 7.88968 5.92098 8.03033 5.78033C8.17098 5.63968 8.25 5.44891 8.25 5.25V4.5H15.75V5.25C15.75 5.44891 15.829 5.63968 15.9697 5.78033C16.1103 5.92098 16.3011 6 16.5 6C16.6989 6 16.8897 5.92098 17.0303 5.78033C17.171 5.63968 17.25 5.44891 17.25 5.25V4.5H19.5V7.5H4.5V4.5H6.75ZM19.5 19.5H4.5V9H19.5V19.5Z" fill="currentColor"/></svg><span class="plx-tooltip">Schedule</span></div>
+          <div class="ctv-player-icon-btn" data-action="lastchannel"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M12.2487 7.50002V11.5753L15.6349 13.6069C15.8055 13.7093 15.9284 13.8753 15.9766 14.0684C16.0247 14.2614 15.9943 14.4657 15.8918 14.6363C15.7894 14.8068 15.6234 14.9297 15.4303 14.9779C15.2373 15.0261 15.033 14.9956 14.8624 14.8931L11.1124 12.6431C11.0014 12.5765 10.9096 12.4822 10.8459 12.3695C10.7821 12.2568 10.7486 12.1295 10.7487 12V7.50002C10.7487 7.30111 10.8277 7.11034 10.9684 6.96969C11.109 6.82904 11.2998 6.75002 11.4987 6.75002C11.6976 6.75002 11.8884 6.82904 12.029 6.96969C12.1697 7.11034 12.2487 7.30111 12.2487 7.50002ZM20.7856 5.30721C20.6485 5.25036 20.4977 5.23542 20.3522 5.26429C20.2067 5.29316 20.073 5.36454 19.9681 5.46939L18.8112 6.62908C18.5084 6.30002 18.1962 5.97283 17.8643 5.63627C16.6135 4.38537 15.0219 3.53079 13.2882 3.17932C11.5545 2.82785 9.75573 2.99507 8.11655 3.66008C6.47737 4.3251 5.07051 5.45842 4.07175 6.91843C3.073 8.37845 2.52664 10.1004 2.50095 11.8692C2.47526 13.6379 2.97138 15.375 3.92731 16.8634C4.88324 18.3519 6.25659 19.5256 7.87577 20.2379C9.49494 20.9502 11.2881 21.1696 13.0313 20.8687C14.7744 20.5677 16.3902 19.7597 17.6768 18.5456C17.7485 18.4779 17.8061 18.3968 17.8464 18.3068C17.8866 18.2168 17.9088 18.1198 17.9116 18.0212C17.9144 17.9227 17.8977 17.8246 17.8626 17.7324C17.8275 17.6403 17.7745 17.556 17.7068 17.4844C17.6391 17.4127 17.5579 17.3551 17.468 17.3148C17.378 17.2746 17.2809 17.2524 17.1824 17.2496C17.0839 17.2468 16.9857 17.2635 16.8936 17.2986C16.8015 17.3337 16.7172 17.3867 16.6456 17.4544C15.5735 18.466 14.2272 19.1392 12.7747 19.39C11.3223 19.6409 9.82811 19.4582 8.47889 18.8648C7.12968 18.2714 5.98522 17.2935 5.18849 16.0535C4.39176 14.8134 3.97809 13.3661 3.99915 11.8923C4.0202 10.4185 4.47506 8.98357 5.30689 7.76677C6.13872 6.54998 7.31065 5.60527 8.67627 5.05065C10.0419 4.49603 11.5407 4.35609 12.9854 4.64832C14.43 4.94056 15.7566 5.652 16.7993 6.69377C17.1312 7.02939 17.4434 7.35939 17.7471 7.69033L16.2181 9.21939C16.1131 9.32429 16.0415 9.45798 16.0125 9.60354C15.9836 9.7491 15.9984 9.89999 16.0552 10.0371C16.112 10.1742 16.2083 10.2914 16.3317 10.3738C16.4551 10.4562 16.6003 10.5001 16.7487 10.5H20.4987C20.6976 10.5 20.8884 10.421 21.029 10.2803C21.1697 10.1397 21.2487 9.94893 21.2487 9.75002V6.00002C21.2487 5.85168 21.2046 5.70669 21.1222 5.58337C21.0398 5.46005 20.9226 5.36395 20.7856 5.30721Z" fill="currentColor"/></svg><span class="plx-tooltip">Play the last channel</span></div>
+          <div class="ctv-player-icon-btn" data-action="captions"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M21 4.5H3C2.60218 4.5 2.22064 4.65804 1.93934 4.93934C1.65804 5.22064 1.5 5.60218 1.5 6V18C1.5 18.3978 1.65804 18.7794 1.93934 19.0607C2.22064 19.342 2.60218 19.5 3 19.5H21C21.3978 19.5 21.7794 19.342 22.0607 19.0607C22.342 18.7794 22.5 18.3978 22.5 18V6C22.5 5.60218 22.342 5.22064 22.0607 4.93934C21.7794 4.65804 21.3978 4.5 21 4.5ZM21 18H3V6H21V18ZM11.1487 14.2228C11.2483 14.395 11.2754 14.5997 11.2241 14.7918C11.1727 14.984 11.0472 15.1479 10.875 15.2475C10.3049 15.5767 9.65826 15.75 8.99998 15.75C8.3417 15.75 7.69501 15.5768 7.12492 15.2476C6.55482 14.9185 6.08141 14.4451 5.75226 13.875C5.42312 13.305 5.24984 12.6583 5.24984 12C5.24984 11.3417 5.42312 10.695 5.75226 10.125C6.08141 9.55488 6.55482 9.08148 7.12492 8.75236C7.69501 8.42323 8.3417 8.24997 8.99998 8.25C9.65826 8.25003 10.3049 8.42333 10.875 8.7525C10.963 8.80029 11.0406 8.86523 11.1031 8.94348C11.1656 9.02173 11.2118 9.11171 11.239 9.20811C11.2661 9.3045 11.2737 9.40536 11.2613 9.50474C11.2489 9.60412 11.2166 9.7 11.1665 9.78673C11.1165 9.87345 11.0495 9.94927 10.9696 10.0097C10.8898 10.0701 10.7986 10.1139 10.7015 10.1386C10.6044 10.1632 10.5034 10.1681 10.4044 10.1531C10.3054 10.138 10.2104 10.1033 10.125 10.0509C9.78294 9.85366 9.39499 9.74987 9.00012 9.75C8.60525 9.75013 8.21736 9.85418 7.87544 10.0517C7.53351 10.2492 7.24959 10.5332 7.05219 10.8752C6.85479 11.2172 6.75088 11.6051 6.75088 12C6.75088 12.3949 6.85479 12.7828 7.05219 13.1248C7.24959 13.4668 7.53351 13.7508 7.87544 13.9483C8.21736 14.1458 8.60525 14.2499 9.00012 14.25C9.39499 14.2501 9.78294 14.1463 10.125 13.9491C10.2971 13.8498 10.5016 13.8229 10.6935 13.8742C10.8854 13.9255 11.0492 14.0509 11.1487 14.2228ZM18.6487 14.2228C18.7483 14.395 18.7754 14.5997 18.7241 14.7918C18.6727 14.984 18.5472 15.1479 18.375 15.2475C17.8049 15.5767 17.1583 15.75 16.5 15.75C15.8417 15.75 15.195 15.5768 14.6249 15.2476C14.0548 14.9185 13.5814 14.4451 13.2523 13.875C12.9231 13.305 12.7498 12.6583 12.7498 12C12.7498 11.3417 12.9231 10.695 13.2523 10.125C13.5814 9.55488 14.0548 9.08148 14.6249 8.75236C15.195 8.42323 15.8417 8.24997 16.5 8.25C17.1583 8.25003 17.8049 8.42333 18.375 8.7525C18.463 8.80029 18.5406 8.86523 18.6031 8.94348C18.6656 9.02173 18.7118 9.11171 18.739 9.20811C18.7661 9.3045 18.7737 9.40536 18.7613 9.50474C18.7489 9.60412 18.7166 9.7 18.6665 9.78673C18.6165 9.87345 18.5495 9.94927 18.4696 10.0097C18.3898 10.0701 18.2986 10.1139 18.2015 10.1386C18.1044 10.1632 18.0034 10.1681 17.9044 10.1531C17.8054 10.138 17.7104 10.1033 17.625 10.0509C17.2829 9.85366 16.895 9.74987 16.5001 9.75C16.1052 9.75013 15.7174 9.85418 15.3754 10.0517C15.0335 10.2492 14.7496 10.5332 14.5522 10.8752C14.3548 11.2172 14.2509 11.6051 14.2509 12C14.2509 12.3949 14.3548 12.7828 14.5522 13.1248C14.7496 13.4668 15.0335 13.7508 15.3754 13.9483C15.7174 14.1458 16.1052 14.2499 16.5001 14.25C16.895 14.2501 17.2829 14.1463 17.625 13.9491C17.7971 13.8498 18.0016 13.8229 18.1935 13.8742C18.3854 13.9255 18.5492 14.0509 18.6487 14.2228Z" fill="currentColor"/></svg><span class="plx-tooltip">Closed captions</span></div>
+          <div class="ctv-player-icon-btn" data-action="settings"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M11.5009 7.38549C10.6109 7.38549 9.74097 7.65612 9.001 8.16316C8.26103 8.6702 7.6843 9.39088 7.34373 10.2341C7.00316 11.0772 6.91405 12.005 7.08767 12.9002C7.26129 13.7953 7.68985 14.6175 8.31914 15.2628C8.94843 15.9082 9.75019 16.3476 10.623 16.5257C11.4959 16.7037 12.4006 16.6124 13.2228 16.2631C14.045 15.9138 14.7478 15.3224 15.2422 14.5636C15.7367 13.8047 16.0006 12.9126 16.0006 11.9999C15.9993 10.7765 15.5249 9.60353 14.6813 8.73843C13.8377 7.87333 12.6939 7.38676 11.5009 7.38549ZM11.5009 15.0762C10.9076 15.0762 10.3276 14.8958 9.8343 14.5578C9.34099 14.2197 8.95649 13.7393 8.72945 13.1772C8.5024 12.615 8.443 11.9965 8.55874 11.3998C8.67449 10.803 8.96019 10.2549 9.37972 9.82466C9.79925 9.39443 10.3338 9.10144 10.9157 8.98274C11.4976 8.86404 12.1007 8.92496 12.6489 9.1578C13.197 9.39064 13.6655 9.78493 13.9951 10.2908C14.3247 10.7967 14.5007 11.3915 14.5007 11.9999C14.5007 12.8158 14.1846 13.5983 13.6221 14.1752C13.0595 14.7521 12.2965 15.0762 11.5009 15.0762ZM21.807 10.0013C21.7861 9.89299 21.7428 9.79058 21.6798 9.701C21.6169 9.61142 21.5359 9.53679 21.4424 9.48217L18.646 7.84789L18.6348 4.61587C18.6344 4.50456 18.6105 4.39465 18.5647 4.29374C18.5189 4.19282 18.4523 4.10331 18.3695 4.03137C17.3551 3.15146 16.187 2.47714 14.9272 2.04428C14.828 2.00985 14.7229 1.9971 14.6186 2.00687C14.5143 2.01664 14.4131 2.04871 14.3216 2.101L11.5009 3.71798L8.67734 2.09812C8.5858 2.04553 8.48452 2.01322 8.38005 2.00329C8.27557 1.99335 8.17023 2.00601 8.07082 2.04044C6.81199 2.47646 5.64521 3.15335 4.63232 4.03522C4.54961 4.10705 4.48306 4.19641 4.43726 4.29715C4.39146 4.39788 4.3675 4.5076 4.36703 4.61875L4.35296 7.85366L1.5566 9.48794C1.46305 9.54256 1.38206 9.61719 1.31913 9.70677C1.25621 9.79634 1.21283 9.89876 1.19194 10.0071C0.936019 11.3259 0.936019 12.6835 1.19194 14.0024C1.21283 14.1107 1.25621 14.2131 1.31913 14.3027C1.38206 14.3923 1.46305 14.4669 1.5566 14.5215L4.35296 16.1558L4.36421 19.3878C4.36455 19.4991 4.38845 19.609 4.43425 19.7099C4.48006 19.8109 4.54668 19.9004 4.62951 19.9723C5.64388 20.8522 6.812 21.5265 8.07176 21.9594C8.17097 21.9938 8.27611 22.0066 8.38041 21.9968C8.48471 21.987 8.58586 21.955 8.67734 21.9027L11.5009 20.2819L14.3244 21.9017C14.4362 21.9656 14.5621 21.9987 14.69 21.9979C14.7719 21.9978 14.8533 21.9842 14.931 21.9575C16.1896 21.522 17.3564 20.8458 18.3695 19.9646C18.4522 19.8928 18.5187 19.8034 18.5645 19.7027C18.6103 19.602 18.6343 19.4922 18.6348 19.3811L18.6488 16.1462L21.4452 14.5119C21.5387 14.4573 21.6197 14.3826 21.6826 14.2931C21.7456 14.2035 21.7889 14.1011 21.8098 13.9928C22.0643 12.675 22.0634 11.3187 21.807 10.0013ZM20.4009 13.3573L17.7226 14.9195C17.6053 14.9879 17.5081 15.0876 17.4414 15.2079C17.387 15.304 17.3298 15.4059 17.2717 15.5021C17.1973 15.6233 17.1577 15.7636 17.1574 15.9068L17.1433 19.0071C16.4234 19.5869 15.6214 20.0505 14.765 20.3818L12.0633 18.8379C11.9512 18.7743 11.825 18.7412 11.6968 18.7418H11.679C11.5656 18.7418 11.4512 18.7418 11.3378 18.7418C11.2036 18.7384 11.071 18.7715 10.9534 18.8379L8.24987 20.3857C7.39166 20.0568 6.58745 19.5955 5.86504 19.0177L5.85473 15.9222C5.85427 15.7787 5.81465 15.6381 5.74037 15.5165C5.68224 15.4204 5.62506 15.3242 5.57163 15.2223C5.50537 15.1001 5.40822 14.9985 5.2904 14.9282L2.60934 13.3621C2.4706 12.4621 2.4706 11.5454 2.60934 10.6454L5.2829 9.08033C5.40024 9.0119 5.4974 8.91227 5.56413 8.79193C5.6185 8.69579 5.67568 8.59389 5.7338 8.49776C5.8082 8.37653 5.84783 8.23627 5.84817 8.09303L5.86223 4.99271C6.58211 4.41297 7.38411 3.94939 8.2405 3.618L10.9384 5.16191C11.0558 5.22865 11.1886 5.26185 11.3228 5.25804C11.4362 5.25804 11.5506 5.25804 11.664 5.25804C11.7982 5.26148 11.9308 5.2283 12.0483 5.16191L14.7519 3.61415C15.6101 3.943 16.4143 4.40431 17.1367 4.98214L17.147 8.07765C17.1475 8.22118 17.1871 8.3617 17.2614 8.48334C17.3195 8.57947 17.3767 8.67561 17.4301 8.77751C17.4964 8.89971 17.5936 9.00133 17.7114 9.07168L20.3924 10.6377C20.533 11.5384 20.5346 12.4561 20.3971 13.3573H20.4009Z" fill="currentColor"/></svg><span class="plx-tooltip">Settings</span></div>
+          <div class="ctv-player-icon-btn" data-action="accessibility"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M12 2.25C10.0716 2.25 8.18657 2.82183 6.58319 3.89317C4.97982 4.96452 3.73013 6.48726 2.99218 8.26884C2.25422 10.0504 2.06114 12.0108 2.43735 13.9021C2.81355 15.7934 3.74215 17.5307 5.10571 18.8943C6.46928 20.2579 8.20656 21.1865 10.0979 21.5627C11.9892 21.9389 13.9496 21.7458 15.7312 21.0078C17.5127 20.2699 19.0355 19.0202 20.1068 17.4168C21.1782 15.8134 21.75 13.9284 21.75 12C21.7473 9.41498 20.7192 6.93661 18.8913 5.10872C17.0634 3.28084 14.585 2.25273 12 2.25ZM12 20.25C10.3683 20.25 8.77326 19.7661 7.41655 18.8596C6.05984 17.9531 5.00242 16.6646 4.378 15.1571C3.75358 13.6496 3.5902 11.9908 3.90853 10.3905C4.22685 8.79016 5.01259 7.32015 6.16637 6.16637C7.32016 5.01259 8.79017 4.22685 10.3905 3.90852C11.9909 3.59019 13.6497 3.75357 15.1571 4.37799C16.6646 5.00242 17.9531 6.05984 18.8596 7.41655C19.7662 8.77325 20.25 10.3683 20.25 12C20.2475 14.1873 19.3775 16.2843 17.8309 17.8309C16.2843 19.3775 14.1873 20.2475 12 20.25ZM10.5 7.5C10.5 7.20333 10.588 6.91332 10.7528 6.66664C10.9176 6.41997 11.1519 6.22771 11.426 6.11418C11.7001 6.00065 12.0017 5.97094 12.2926 6.02882C12.5836 6.0867 12.8509 6.22956 13.0607 6.43934C13.2704 6.64912 13.4133 6.91639 13.4712 7.20736C13.5291 7.49834 13.4994 7.79994 13.3858 8.07402C13.2723 8.34811 13.08 8.58238 12.8334 8.7472C12.5867 8.91203 12.2967 9 12 9C11.6022 9 11.2206 8.84196 10.9393 8.56066C10.658 8.27936 10.5 7.89782 10.5 7.5ZM17.25 10.5C17.25 10.6989 17.171 10.8897 17.0303 11.0303C16.8897 11.171 16.6989 11.25 16.5 11.25H12.75V12.5231L15.6244 16.8356C15.7348 17.0012 15.7749 17.2039 15.7358 17.399C15.6968 17.5942 15.5818 17.7659 15.4163 17.8762C15.2507 17.9866 15.048 18.0267 14.8528 17.9877C14.6577 17.9487 14.486 17.8337 14.3756 17.6681L12 14.1056L9.62438 17.6681C9.56972 17.7501 9.49944 17.8205 9.41756 17.8754C9.33568 17.9302 9.2438 17.9684 9.14717 17.9877C8.95202 18.0267 8.74935 17.9866 8.58375 17.8762C8.41816 17.7659 8.3032 17.5942 8.26417 17.399C8.22514 17.2039 8.26523 17.0012 8.37563 16.8356L11.25 12.5231V11.25H7.5C7.30109 11.25 7.11033 11.171 6.96967 11.0303C6.82902 10.8897 6.75 10.6989 6.75 10.5C6.75 10.3011 6.82902 10.1103 6.96967 9.96967C7.11033 9.82902 7.30109 9.75 7.5 9.75H16.5C16.6989 9.75 16.8897 9.82902 17.0303 9.96967C17.171 10.1103 17.25 10.3011 17.25 10.5Z" fill="currentColor"/></svg><span class="plx-tooltip">Accessibility</span></div>
+        </div>
+      </div>
+      <div class="ctv-player-progress"><div class="ctv-player-progress-played live" id="progressPlayed"><div class="ctv-player-progress-head"></div></div></div>
+      <div class="ctv-player-time"><span class="el" id="timeElapsed"></span><span class="rem" id="timeRemaining"></span></div>
+    </div>
+
+    <!-- More Live TV: hidden until Down is pressed -->
+    <div class="plx-more-tv" id="moreTv">
+      <div class="plx-viewport"><div class="plx-track" id="moreTrack"></div></div>
+      <div class="plx-chips" id="moreChips"></div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="ctv-player-hint" id="playerHint">&larr; &rarr; &uarr; &darr; Navigate &bull; Enter Select &bull; Esc Back</div>
+</div>
+
+<script>
+const navbar = document.getElementById('ctvNavbar');
+const flyout = document.getElementById('navFlyout');
+const navProfile = document.getElementById('navProfile');
+const navItemEls = Array.from(document.querySelectorAll('.ctv-nav-item'));
+const flyoutItemEls = Array.from(document.querySelectorAll('.ctv-flyout-item'));
+let flyoutOpen = false, navFocusZone = 'content', navFocusIdx = -1, flyoutFocusIdx = 0;
+
+function updateNavUI() {
+  const shouldExpand = (navFocusZone === 'nav' && navFocusIdx === -1) || flyoutOpen;
+  navbar.classList.toggle('expanded', shouldExpand);
+  navbar.classList.toggle('flyout-open', flyoutOpen);
+  flyout.classList.toggle('visible', flyoutOpen);
+  navProfile.classList.remove('focused');
+  navItemEls.forEach(item => item.classList.remove('focused'));
+  flyoutItemEls.forEach(item => item.classList.remove('focused'));
+  if (navFocusZone === 'nav') {
+    if (navFocusIdx === -1) navProfile.classList.add('focused');
+    else if (navFocusIdx >= 0 && navFocusIdx < navItemEls.length) navItemEls[navFocusIdx].classList.add('focused');
+  } else if (navFocusZone === 'flyout') {
+    if (flyoutFocusIdx >= 0 && flyoutFocusIdx < flyoutItemEls.length) flyoutItemEls[flyoutFocusIdx].classList.add('focused');
+  }
+}
+function enterCtvNav() {
+  navFocusZone = 'nav';
+  const activeIdx = navItemEls.findIndex(i => i.classList.contains('active'));
+  navFocusIdx = activeIdx >= 0 ? activeIdx : 0;
+  updateNavUI();
+}
+function exitCtvNav() { flyoutOpen = false; navFocusZone = 'content'; navFocusIdx = -1; flyoutFocusIdx = 0; updateNavUI(); }
+function selectCtvNavItem() {
+  if (navFocusIdx === -1) { flyoutOpen = true; navFocusZone = 'flyout'; flyoutFocusIdx = 0; updateNavUI(); }
+  else if (navFocusIdx >= 0 && navFocusIdx < navItemEls.length) {
+    navItemEls.forEach(i => i.classList.remove('active'));
+    navItemEls[navFocusIdx].classList.add('active');
+    const pageId = navItemEls[navFocusIdx].getAttribute('data-page');
+    if (typeof navigateToPage === 'function') navigateToPage(pageId);
+    exitCtvNav();
+  }
+}
+function handleNavKeydown(e) {
+  const key = e.key;
+  if (navFocusZone === 'content') { if (key === 'ArrowLeft') { e.preventDefault(); enterCtvNav(); return true; } return false; }
+  if (navFocusZone === 'nav') {
+    switch (key) {
+      case 'ArrowUp': e.preventDefault(); navFocusIdx = Math.max(-1, navFocusIdx - 1); updateNavUI(); return true;
+      case 'ArrowDown': e.preventDefault(); navFocusIdx = Math.min(navItemEls.length - 1, navFocusIdx + 1); updateNavUI(); return true;
+      case 'ArrowRight': case 'Escape': e.preventDefault(); exitCtvNav(); return true;
+      case 'ArrowLeft': e.preventDefault(); if (navFocusIdx === -1) { flyoutOpen = true; navFocusZone = 'flyout'; flyoutFocusIdx = 0; updateNavUI(); } return true;
+      case 'Enter': case ' ': e.preventDefault(); selectCtvNavItem(); return true;
+    } return true;
+  }
+  if (navFocusZone === 'flyout') {
+    switch (key) {
+      case 'ArrowUp': e.preventDefault(); flyoutFocusIdx = Math.max(0, flyoutFocusIdx - 1); updateNavUI(); return true;
+      case 'ArrowDown': e.preventDefault(); flyoutFocusIdx = Math.min(flyoutItemEls.length - 1, flyoutFocusIdx + 1); updateNavUI(); return true;
+      case 'ArrowRight': case 'Escape': e.preventDefault(); flyoutOpen = false; navFocusZone = 'nav'; navFocusIdx = -1; updateNavUI(); return true;
+      case 'Enter': case ' ': e.preventDefault(); flyoutItemEls.forEach(i => i.classList.remove('selected')); if (flyoutFocusIdx < 3) flyoutItemEls[flyoutFocusIdx].classList.add('selected'); return true;
+    } return true;
+  }
+  return false;
+}
+document.addEventListener('keydown', (e) => { if (handleNavKeydown(e)) return; });
+updateNavUI();
+
+</script>
+<script>
+(function(){
+const stage=document.getElementById('plxStage'), root=document.getElementById('ctvPlayerRoot'), ctrls=document.getElementById('playerControls');
+const N=document.createElement('div'); N.id='gmN';
+N.innerHTML='<div class="gt"><i></i></div><div class="gb"><div class="gi"><img src="image assets/ubereats.png" alt="Uber Eats"></div><div class="gx"><div class="gk"></div><div class="gh"></div><div class="gp"></div><div class="gc"><span class="gbt f"></span><span class="gbt"></span></div></div></div>';
+stage.appendChild(N);
+const K=N.querySelector('.gk'), H=N.querySelector('.gh'), P=N.querySelector('.gp'), B=[...N.querySelectorAll('.gbt')];
+let st='off', fi=0, tm=0, tm2=0;
+const paint=()=>B.forEach((b,i)=>b.classList.toggle('f',i===fi));
+function show(){
+  if(st!=='off') return;
+  if(document.querySelector('#vcR.on')||['lsg','vc-listen','vc-take'].some(c=>stage.classList.contains(c))||(window.usOpen&&window.usOpen())) return;
+  const LS=window.LS||{}; let c=LS.cur&&LS.cur(); if(!c||c.kind!=='sport'||!c.teams) c=(LS.CAT||[]).find(x=>x.id==='rvb')||{teams:['Rangers','Bruins'],score:['3','','2']};
+  const a=(+c.score[0]||0)+1, b=+c.score[2]||0; const fav=c.teams[0], opp=c.teams[1];
+  K.innerHTML='<b>'+fav+' '+a+'</b> – '+b+' '+opp+'  •  3rd period, 10:00 left';
+  H.textContent='It’s looking like a win!'; P.textContent='Let’s celebrate with drinks and tacos.';
+  B[0].textContent='Order now on Uber Eats'; B[1].textContent='Not now'; B[1].style.display='';
+  N.classList.remove('ok'); void N.offsetWidth; fi=0; paint(); st='on'; N.classList.add('on');
+  clearTimeout(tm); tm=setTimeout(hide,20000); }
+function hide(){ clearTimeout(tm); clearTimeout(tm2); st='off'; N.classList.remove('on'); }
+function order(){ clearTimeout(tm); st='ok'; N.classList.add('ok'); H.textContent='Order started on Uber Eats'; P.textContent='We sent a checkout link to your phone.'; B[0].textContent='Done'; B[1].style.display='none'; fi=0; paint(); tm2=setTimeout(hide,6000); }
+window.addEventListener('keydown',e=>{
+  if(st==='off'||e.__gm) return; const k=e.key;
+  if(k==='m'||k==='M') return;
+  if(k==='Escape'||k==='Backspace'||k==='Delete'){ e.preventDefault(); e.stopImmediatePropagation(); hide(); return; }
+  if(k==='Enter'||k===' '){ e.preventDefault(); e.stopImmediatePropagation(); if(st==='ok'||fi===1) hide(); else order(); return; }
+  if((k==='ArrowLeft'||k==='ArrowRight')&&st==='on'){ e.preventDefault(); e.stopImmediatePropagation(); fi=k==='ArrowRight'?1:0; paint(); }
+},true);
+B.forEach((b,i)=>b.addEventListener('click',()=>{ if(st==='off') return; if(st==='ok'||i===1) hide(); else order(); }));
+window.gmShow=show;
+window.addEventListener('load',()=>{ const row=document.querySelector('#vcRemote .row'); if(!row) return; const b=document.createElement('button'); b.type='button'; b.className='gmb'; b.textContent='Show game offer'; b.addEventListener('click',()=>{ b.blur(); show(); }); row.appendChild(b); });
+window.addEventListener('keydown',e=>{ if((e.key==='n'||e.key==='N')&&!e.metaKey&&!e.ctrlKey) show(); });
+})();
+</script>
+<script>
+/* ===== Voice as a native input (prototype). Hold the mic on the on-screen remote (or hold M), speak, the TV answers.
+   Registered BEFORE the other layers so it sees keys first. ===== */
+(function(){
+const $=id=>document.getElementById(id), stage=$('plxStage'), root=$('ctvPlayerRoot');
+const MIC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+const PLAY='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+const Q_DEMO="What's that latest Tom Cruise movie where he's an old man millionaire?";
+const DIGGER={id:'digger',t:'Digger',kick:"Here's the one you mean",meta:'2026  •  Directed by Alejandro G. Iñárritu',cast:'Starring Tom Cruise, Riz Ahmed, John Goodman, Sandra Hüller',line:"The most powerful man in the world races to prove he's humanity's savior before a disaster he unleashed destroys everything.",poster:'image assets/cards/digger-poster.png',trailer:'video assets/digger.mp4',say:"That's Digger, the new Tom Cruise film from Alejandro González Iñárritu. Want to watch it?"};
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function genPoster(t){ const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 630"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a2b14"/><stop offset="1" stop-color="#0d0905"/></linearGradient></defs><rect width="420" height="630" fill="url(#g)"/><text x="210" y="330" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="58" fill="rgba(255,255,255,.92)">'+esc(t.toUpperCase())+'</text></svg>'; return 'data:image/svg+xml;utf8,'+encodeURIComponent(svg).replace(/\(/g,'%28').replace(/\)/g,'%29').replace(/'/g,'%27'); }
+function fromCat(x){ const LS=window.LS, cl=(window.LSCLIPS||{})[x.id];
+  return {id:x.id,cat:x,t:x.t,kick:'Best match',meta:(x.meta||x.s||''),cast:x.ch?'On '+x.ch:'',line:'',poster:'image assets/'+x.img,trailer:cl?'video assets/'+cl+'.mp4':'',say:"Here's "+x.t+". Want to watch it?"}; }
+function match(q){ q=q.toLowerCase();
+  if(/digger|cruise|millionaire|old man/.test(q)) return DIGGER;
+  const LS=window.LS; if(LS){ const hit=LS.CAT.find(x=>x.id!=='digger'&&q.includes(x.t.toLowerCase())); if(hit) return fromCat(hit); }
+  return null; }
+
+/* ---- layout: TV on the left, remote on the right ---- */
+let vT='';
+function vfit(){
+  if(typeof RM==='undefined'||!RM.querySelector) return;
+  const aw=innerWidth, B=0, M=0, ST=0;
+  const s=Math.max(.15,Math.min((aw-2*(M+B))/1920,(innerHeight-2*M-2*B-ST)/1080)); const w=1920*s, h=1080*s;
+  const top0=Math.max(M,(innerHeight-(h+2*B+ST))/2), cy=top0+B+h/2;
+  stage.style.top=cy+'px'; vT='scale('+s+') translate(-50%,-50%)'; stage.style.transform=vT; vT=stage.style.transform;
+  if(TVF){ TVF.style.left=((aw-w)/2-B)+'px'; TVF.style.top=(top0)+'px'; TVF.style.width=(w+2*B)+'px'; TVF.style.height=(h+2*B)+'px'; } }
+const TVF=null;
+new MutationObserver(()=>{ if(vT&&stage.style.transform!==vT) vfit(); }).observe(stage,{attributes:true,attributeFilter:['style']});
+window.fit=vfit; addEventListener('resize',vfit); addEventListener('load',()=>{ vfit(); setTimeout(vfit,300); });
+
+/* ---- overlays inside the TV stage ---- */
+const L=document.createElement('div'); L.id='vcL';
+L.innerHTML='<div class="dim"></div><div class="glow"></div><div class="cap"><div class="pill"><div class="ic"><div class="wv">'+'<i></i>'.repeat(5)+'</div></div><div class="tx"></div></div></div>';
+stage.appendChild(L);
+const TX=L.querySelector('.tx'), PILL=L.querySelector('.pill'), BARS=[...L.querySelectorAll('.wv i')], BASE=[11,27,38,19,8];
+const LB={set textContent(v){ if(v==='Listening\u2026'||v==='Looking\u2026') return; setTx(v,true); }};
+const R=document.createElement('div'); R.id='vcR';
+R.innerHTML='<div class="bgv"><div class="fb"></div><video muted loop playsinline preload="auto"></video></div><div class="scrim"></div><div class="body"><div class="hd"><div class="kick"></div><div class="bkh"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.83868 2.76435C8.13157 3.05724 8.13157 3.53211 7.83868 3.82501L3.86901 7.79468L7.83868 11.7643C8.13157 12.0572 8.13157 12.5321 7.83868 12.825C7.54579 13.1179 7.07091 13.1179 6.77802 12.825L2.27802 8.32501C1.98513 8.03211 1.98513 7.55724 2.27802 7.26435L6.77802 2.76435C7.07091 2.47145 7.54579 2.47145 7.83868 2.76435Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M2.05835 7.79468C2.05835 7.38046 2.39414 7.04468 2.80835 7.04468H15.5583C17.1496 7.04468 18.6758 7.67682 19.801 8.80204C20.9262 9.92726 21.5583 11.4534 21.5583 13.0447C21.5583 14.636 20.9262 16.1621 19.801 17.2873C18.6758 18.4125 17.1496 19.0447 15.5583 19.0447H7.30835C6.89414 19.0447 6.55835 18.7089 6.55835 18.2947C6.55835 17.8805 6.89414 17.5447 7.30835 17.5447H15.5583C16.7518 17.5447 17.8964 17.0706 18.7403 16.2267C19.5842 15.3827 20.0583 14.2382 20.0583 13.0447C20.0583 11.8512 19.5842 10.7066 18.7403 9.8627C17.8964 9.01878 16.7518 8.54468 15.5583 8.54468H2.80835C2.39414 8.54468 2.05835 8.20889 2.05835 7.79468Z" fill="currentColor"/></svg>Back</div></div><div class="top"><div class="pz"><img alt=""></div><div class="ti"><div class="t"></div><div class="m"></div><div class="cs"></div></div></div><div class="l"></div><div class="cta"><div class="b" data-b="0"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg></span><span class="lb">Play now</span></div><div class="b" data-b="1"><span class="ic"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.25C10.0716 2.25 8.18657 2.82183 6.58319 3.89317C4.97982 4.96452 3.73013 6.48726 2.99218 8.26884C2.25422 10.0504 2.06114 12.0108 2.43735 13.9021C2.81355 15.7934 3.74215 17.5307 5.10571 18.8943C6.46928 20.2579 8.20656 21.1865 10.0979 21.5627C11.9892 21.9389 13.9496 21.7458 15.7312 21.0078C17.5127 20.2699 19.0355 19.0202 20.1068 17.4168C21.1782 15.8134 21.75 13.9284 21.75 12C21.7473 9.41498 20.7192 6.93661 18.8913 5.10872C17.0634 3.28084 14.585 2.25273 12 2.25ZM12 20.25C10.3683 20.25 8.77326 19.7661 7.41655 18.8596C6.05984 17.9531 5.00242 16.6646 4.378 15.1571C3.75358 13.6496 3.5902 11.9908 3.90853 10.3905C4.22685 8.79016 5.01259 7.32015 6.16637 6.16637C7.32016 5.01259 8.79017 4.22685 10.3905 3.90852C11.9909 3.59019 13.6497 3.75357 15.1571 4.37799C16.6646 5.00242 17.9531 6.05984 18.8596 7.41655C19.7662 8.77325 20.25 10.3683 20.25 12C20.2475 14.1873 19.3775 16.2843 17.8309 17.8309C16.2843 19.3775 14.1873 20.2475 12 20.25ZM16.5 12C16.5 12.1989 16.421 12.3897 16.2803 12.5303C16.1397 12.671 15.9489 12.75 15.75 12.75H12.75V15.75C12.75 15.9489 12.671 16.1397 12.5303 16.2803C12.3897 16.421 12.1989 16.5 12 16.5C11.8011 16.5 11.6103 16.421 11.4697 16.2803C11.329 16.1397 11.25 15.9489 11.25 15.75V12.75H8.25C8.05109 12.75 7.86033 12.671 7.71967 12.5303C7.57902 12.3897 7.5 12.1989 7.5 12C7.5 11.8011 7.57902 11.6103 7.71967 11.4697C7.86033 11.329 8.05109 11.25 8.25 11.25H11.25V8.25C11.25 8.05109 11.329 7.86032 11.4697 7.71967C11.6103 7.57902 11.8011 7.5 12 7.5C12.1989 7.5 12.3897 7.57902 12.5303 7.71967C12.671 7.86032 12.75 8.05109 12.75 8.25V11.25H15.75C15.9489 11.25 16.1397 11.329 16.2803 11.4697C16.421 11.6103 16.5 11.8011 16.5 12Z" fill="currentColor"/></svg></span><span class="lb">My Stuff</span></div></div><div class="det"></div></div></div>';
+stage.appendChild(R);
+const VID=R.querySelector('video'), FB=R.querySelector('.fb'), IMG=R.querySelector('.pz img'), BTN=[...R.querySelectorAll('.b')], DET=R.querySelector('.det');
+
+/* ---- on-screen remote ---- */
+const RM=document.createElement('div'); RM.id='vcRemote';
+const arrow=(d)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="'+d+'"/></svg>';
+RM.innerHTML='<div class="rwrap"><div class="rm"><div class="led"></div><button class="rb mic" id="rmMic" aria-label="Hold to talk">'+MIC+'</button><div class="dp"><button class="rb u" data-k="ArrowUp">'+arrow('M6 15l6-6 6 6')+'</button><button class="rb d" data-k="ArrowDown">'+arrow('M6 9l6 6 6-6')+'</button><button class="rb l" data-k="ArrowLeft">'+arrow('M15 6l-6 6 6 6')+'</button><button class="rb r" data-k="ArrowRight">'+arrow('M9 6l6 6-6 6')+'</button><button class="rb ok" data-k="Enter">OK</button></div><div class="rr"><button class="rb" data-k="Escape" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M7.83868 2.76435C8.13157 3.05724 8.13157 3.53211 7.83868 3.82501L3.86901 7.79468L7.83868 11.7643C8.13157 12.0572 8.13157 12.5321 7.83868 12.825C7.54579 13.1179 7.07091 13.1179 6.77802 12.825L2.27802 8.32501C1.98513 8.03211 1.98513 7.55724 2.27802 7.26435L6.77802 2.76435C7.07091 2.47145 7.54579 2.47145 7.83868 2.76435Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M2.05835 7.79468C2.05835 7.38046 2.39414 7.04468 2.80835 7.04468H15.5583C17.1496 7.04468 18.6758 7.67682 19.801 8.80204C20.9262 9.92726 21.5583 11.4534 21.5583 13.0447C21.5583 14.636 20.9262 16.1621 19.801 17.2873C18.6758 18.4125 17.1496 19.0447 15.5583 19.0447H7.30835C6.89414 19.0447 6.55835 18.7089 6.55835 18.2947C6.55835 17.8805 6.89414 17.5447 7.30835 17.5447H15.5583C16.7518 17.5447 17.8964 17.0706 18.7403 16.2267C19.5842 15.3827 20.0583 14.2382 20.0583 13.0447C20.0583 11.8512 19.5842 10.7066 18.7403 9.8627C17.8964 9.01878 16.7518 8.54468 15.5583 8.54468H2.80835C2.39414 8.54468 2.05835 8.20889 2.05835 7.79468Z" fill="currentColor"/></svg></button><button class="rb" disabled style="opacity:.35" aria-label="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9H4z"/></svg></button></div></div>'
+ +'<div class="cap"><b>Hold the mic</b> (or hold <b>M</b>) and talk</div>'
+ +'<div class="row"><div class="sw" id="swMode"><span data-m="live" class="on">Live mic</span><span data-m="demo">Demo voice</span></div><div class="sw" id="swSay"><span data-s="1" class="on">Spoken reply</span><span data-s="0">Silent</span></div></div></div>';
+setTimeout(vfit,0);   /* the on-screen remote is no longer shown; keyboard only */
+const MICB=$('rmMic');
+let mode=(window.SpeechRecognition||window.webkitSpeechRecognition)?'live':'demo', say=true;
+function setMode(m){ mode=m; RM.querySelectorAll('#swMode span').forEach(s=>s.classList.toggle('on',s.dataset.m===m)); }
+setMode(mode);
+RM.querySelector('#swMode').addEventListener('click',e=>{ const s=e.target.closest('span'); if(s) setMode(s.dataset.m); });
+RM.querySelector('#swSay').addEventListener('click',e=>{ const s=e.target.closest('span'); if(!s) return; say=s.dataset.s==='1'; RM.querySelectorAll('#swSay span').forEach(x=>x.classList.toggle('on',x===s)); });
+RM.querySelectorAll('[data-k]').forEach(b=>b.addEventListener('click',()=>{ const k=b.dataset.k; window.dispatchEvent(new KeyboardEvent('keydown',{key:k,bubbles:true,cancelable:true})); window.dispatchEvent(new KeyboardEvent('keyup',{key:k,bubbles:true})); }));
+
+/* ---- listening engine ---- */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let st='idle', rec=null, hold0=0, tx='', demoT=0, demoI=0, raf=0, level=0, ac=null, an=null, stream=null, buf=null, capT=0, resultOpen=false, fi=0, finishing=false;
+const gridOn=()=>{ const g=$('lsG'); return !!(g&&g.classList.contains('on')); };
+const playerOpen=()=>root.classList.contains('open');
+function sizePill(has){ const w0=PILL.offsetWidth, grow=(!has||w0<=96);
+  TX.style.fontSize=''; if(has){ for(let f=36;f>=26;f-=2){ TX.style.fontSize=f+'px'; PILL.style.transition='none'; PILL.style.width='auto'; if(TX.scrollWidth<=TX.clientWidth+1) break; } }
+  PILL.style.transition='none'; PILL.style.width=has?'auto':'88px'; const w1=PILL.offsetWidth;
+  if(grow){ PILL.style.width=w0+'px'; void PILL.offsetWidth; PILL.style.transition=''; }
+  PILL.style.width=w1+'px'; if(!grow){ void PILL.offsetWidth; PILL.style.transition=''; } }
+function setTx(s,fin){ const has=!!s; TX.innerHTML=has?esc(s)+(fin?'':'<span class="cur"></span>'):''; PILL.classList.toggle('has',has); sizePill(has); TX.scrollLeft=TX.scrollWidth; TX.classList.toggle('ov',TX.scrollWidth>TX.clientWidth+2); }
+function loop(t){
+  let lv=0;
+  if(an){ an.getByteTimeDomainData(buf); let m=0; for(let i=0;i<buf.length;i++){ m=Math.max(m,Math.abs(buf[i]-128)); } lv=Math.min(1,m/70); }
+  else if(st==='listen'){ lv=.28+.3*Math.abs(Math.sin(t/190))+.22*Math.random(); }
+  else if(st==='think'){ lv=.3+.22*Math.sin(t/230); }
+  level+=(lv-level)*.35; L.style.setProperty('--lv',level.toFixed(3));
+  BARS.forEach((b,i)=>{ const w=.5+.5*Math.abs(Math.sin(t/150+i*1.25)); b.style.height=Math.min(56,Math.round(BASE[i]*(.85+level*1.5*w)))+'px'; });
+  raf=requestAnimationFrame(loop); }
+async function startMeter(){ try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); ac=new (window.AudioContext||window.webkitAudioContext)(); const src=ac.createMediaStreamSource(stream); an=ac.createAnalyser(); an.fftSize=512; buf=new Uint8Array(an.fftSize); src.connect(an); }catch(e){ an=null; } }
+function stopMeter(){ an=null; if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } if(ac){ try{ac.close();}catch(e){} ac=null; } }
+function showListen(){ L.classList.remove('think'); L.classList.add('on'); stage.classList.add('vc-listen'); setTx('',false); cancelAnimationFrame(raf); raf=requestAnimationFrame(loop); }
+function hideListen(){ L.classList.remove('on','think'); stage.classList.remove('vc-listen'); setTimeout(()=>{ if(st!=='listen'&&st!=='think'){ cancelAnimationFrame(raf); } },700); }
+function toast(m){ if(window.LS&&window.LS.toast) window.LS.toast(m,2600); }
+function runDemo(){ clearInterval(demoT); demoI=0; demoT=setInterval(()=>{ demoI=Math.min(Q_DEMO.length,demoI+1); tx=Q_DEMO.slice(0,demoI); setTx(tx,false); if(demoI>=Q_DEMO.length){ clearInterval(demoT); if(st==='listen'&&(Date.now()-hold0>=0)&&!held) setTimeout(finish,500); } },42); }
+let held=false;
+function startLive(){
+  try{ rec=new SR(); rec.lang='en-US'; rec.interimResults=true; rec.continuous=false; rec.maxAlternatives=1; }catch(e){ return false; }
+  rec.onresult=e=>{ let s=''; for(let i=0;i<e.results.length;i++) s+=e.results[i][0].transcript; tx=s; setTx(s,false); };
+  rec.onerror=e=>{ if(e.error==='no-speech'||e.error==='aborted') return; if(st==='listen'){ setMode('demo'); toast('Mic unavailable here — switched to demo voice'); try{rec.abort();}catch(x){} rec=null; tx=''; runDemo(); } };
+  rec.onend=()=>{ if(st==='listen'&&mode==='live'&&rec) finish(); };
+  try{ rec.start(); }catch(e){ return false; } startMeter(); return true; }
+let forceDemo=false;
+function start(){
+  if(st!=='idle'||resultOpen||gridOn()||!playerOpen()) return;
+  st='listen'; held=true; hold0=Date.now(); tx=''; finishing=false; RM.classList.add('live'); showListen();
+  clearTimeout(capT); capT=setTimeout(()=>{ if(st==='listen') finish(); },9000);
+  if(mode==='live'&&SR&&!forceDemo){ if(!startLive()){ setMode('demo'); runDemo(); } } else runDemo(); }
+function release(){
+  if(st!=='listen'){ held=false; return; } held=false; RM.classList.remove('live');
+  if(Date.now()-hold0<420){ if(mode==='demo'&&demoI>=Q_DEMO.length) finish(); return; }   /* quick tap: keep listening until the sentence ends */
+  if(mode==='live'&&rec){ try{ rec.stop(); }catch(e){ finish(); } setTimeout(()=>{ if(st==='listen') finish(); },1400); }
+  else { clearInterval(demoT); demoI=Q_DEMO.length; tx=Q_DEMO; setTx(tx,false); setTimeout(finish,350); } }
+function finish(){
+  if(st!=='listen'||finishing) return; finishing=true; clearTimeout(capT); clearInterval(demoT); RM.classList.remove('live'); held=false;
+  if(rec){ try{ rec.abort(); }catch(e){} rec=null; } stopMeter();
+  const q=tx.trim();
+  if(!q){ st='idle'; LB.textContent='Didn’t catch that'; setTimeout(hideListen,1200); return; }
+  st='think'; setTx(q,true); L.classList.add('think'); LB.textContent='Looking…';
+  setTimeout(()=>{ const r=match(q); if(r) showResult(r,q); else { LB.textContent='No match'; L.classList.remove('think'); setTimeout(()=>{ st='idle'; hideListen(); toast('Try: “What’s that latest Tom Cruise movie…”'); },1400); } },900); }
+
+function detailsHTML(r){ return '<div class="dh">Program details</div><div class="dt1">'+esc(r.t)+'</div>'+(r.tag?'<div class="tag">'+esc(r.tag)+'</div>':'')+'<dl>'+(r.dir?'<dt>Director</dt><dd>'+esc(r.dir)+'</dd>':'')+(r.cast?'<dt>Cast</dt><dd>'+esc(r.cast.replace(/^Starring /,''))+'</dd>':'')+(r.year?'<dt>Release</dt><dd>'+esc(r.year)+'</dd>':'')+(r.line?'<dt>Synopsis</dt><dd>'+esc(r.line)+'</dd>':'')+'</dl>'; }
+function act(i){
+  if(i===0){ closeResult(true); }
+  else if(i===1){ const on=BTN[1].classList.toggle('on'); BTN[1].querySelector('.ic').innerHTML=on?MS_ON:MS_OFF; if(window.LS&&window.LS.toast) window.LS.toast(on?'Added to My Stuff \u2014 '+cur.t:'Removed from My Stuff',2400,on); } }
+const MS_OFF='<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.25C10.0716 2.25 8.18657 2.82183 6.58319 3.89317C4.97982 4.96452 3.73013 6.48726 2.99218 8.26884C2.25422 10.0504 2.06114 12.0108 2.43735 13.9021C2.81355 15.7934 3.74215 17.5307 5.10571 18.8943C6.46928 20.2579 8.20656 21.1865 10.0979 21.5627C11.9892 21.9389 13.9496 21.7458 15.7312 21.0078C17.5127 20.2699 19.0355 19.0202 20.1068 17.4168C21.1782 15.8134 21.75 13.9284 21.75 12C21.7473 9.41498 20.7192 6.93661 18.8913 5.10872C17.0634 3.28084 14.585 2.25273 12 2.25ZM12 20.25C10.3683 20.25 8.77326 19.7661 7.41655 18.8596C6.05984 17.9531 5.00242 16.6646 4.378 15.1571C3.75358 13.6496 3.5902 11.9908 3.90853 10.3905C4.22685 8.79016 5.01259 7.32015 6.16637 6.16637C7.32016 5.01259 8.79017 4.22685 10.3905 3.90852C11.9909 3.59019 13.6497 3.75357 15.1571 4.37799C16.6646 5.00242 17.9531 6.05984 18.8596 7.41655C19.7662 8.77325 20.25 10.3683 20.25 12C20.2475 14.1873 19.3775 16.2843 17.8309 17.8309C16.2843 19.3775 14.1873 20.2475 12 20.25ZM16.5 12C16.5 12.1989 16.421 12.3897 16.2803 12.5303C16.1397 12.671 15.9489 12.75 15.75 12.75H12.75V15.75C12.75 15.9489 12.671 16.1397 12.5303 16.2803C12.3897 16.421 12.1989 16.5 12 16.5C11.8011 16.5 11.6103 16.421 11.4697 16.2803C11.329 16.1397 11.25 15.9489 11.25 15.75V12.75H8.25C8.05109 12.75 7.86033 12.671 7.71967 12.5303C7.57902 12.3897 7.5 12.1989 7.5 12C7.5 11.8011 7.57902 11.6103 7.71967 11.4697C7.86033 11.329 8.05109 11.25 8.25 11.25H11.25V8.25C11.25 8.05109 11.329 7.86032 11.4697 7.71967C11.6103 7.57902 11.8011 7.5 12 7.5C12.1989 7.5 12.3897 7.57902 12.5303 7.71967C12.671 7.86032 12.75 8.05109 12.75 8.25V11.25H15.75C15.9489 11.25 16.1397 11.329 16.2803 11.4697C16.421 11.6103 16.5 11.8011 16.5 12Z" fill="currentColor"/></svg>', MS_ON='<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.25C10.0716 2.25 8.18657 2.82183 6.58319 3.89317C4.97982 4.96452 3.73013 6.48726 2.99218 8.26884C2.25422 10.0504 2.06114 12.0108 2.43735 13.9021C2.81355 15.7934 3.74215 17.5307 5.10571 18.8943C6.46928 20.2579 8.20656 21.1865 10.0979 21.5627C11.9892 21.9389 13.9496 21.7458 15.7312 21.0078C17.5127 20.2699 19.0355 19.0202 20.1068 17.4168C21.1782 15.8134 21.75 13.9284 21.75 12C21.7468 9.41513 20.7185 6.93705 18.8907 5.10927C17.063 3.28149 14.5849 2.25323 12 2.25ZM15.75 12.75H12.75V15.75C12.75 15.9489 12.671 16.1397 12.5303 16.2803C12.3897 16.421 12.1989 16.5 12 16.5C11.8011 16.5 11.6103 16.421 11.4697 16.2803C11.329 16.1397 11.25 15.9489 11.25 15.75V12.75H8.25C8.05109 12.75 7.86033 12.671 7.71967 12.5303C7.57902 12.3897 7.5 12.1989 7.5 12C7.5 11.8011 7.57902 11.6103 7.71967 11.4697C7.86033 11.329 8.05109 11.25 8.25 11.25H11.25V8.25C11.25 8.05109 11.329 7.86032 11.4697 7.71967C11.6103 7.57902 11.8011 7.5 12 7.5C12.1989 7.5 12.3897 7.57902 12.5303 7.71967C12.671 7.86032 12.75 8.05109 12.75 8.25V11.25H15.75C15.9489 11.25 16.1397 11.329 16.2803 11.4697C16.421 11.6103 16.5 11.8011 16.5 12C16.5 12.1989 16.421 12.3897 16.2803 12.5303C16.1397 12.671 15.9489 12.75 15.75 12.75Z" fill="currentColor"/></svg>';
+function backOne(){ if(R.classList.contains('dt')){ R.classList.remove('dt'); return; } if(R.classList.contains('cin')){ R.classList.remove('cin'); VID.muted=true; return; } closeResult(false); }
+/* ---- result takeover ---- */
+let cur=null, prevItem=null, back=null;
+function showResult(r,q){
+  prevItem=(window.LS&&window.LS.cur&&window.LS.cur())||null; cur=r; resultOpen=true; st='result'; fi=0; R.classList.remove('dt','cin'); BTN.forEach(b=>b.classList.remove('on')); BTN[1].querySelector('.ic').innerHTML=MS_OFF; VID.muted=true; DET.innerHTML=detailsHTML(r);
+  R.querySelector('.kick').textContent=r.kick; R.querySelector('.t').textContent=r.t; R.querySelector('.m').textContent=r.meta; R.querySelector('.cs').textContent=r.cast?'Starring '+r.cast.replace(/^Starring /,''):'';
+  R.querySelector('.l').textContent=r.line||'';
+  IMG.onerror=()=>{ IMG.onerror=null; IMG.src=genPoster(r.t); }; IMG.src=r.poster;
+  VID.classList.remove('on'); VID.onloadeddata=()=>VID.classList.add('on'); VID.onerror=()=>VID.classList.remove('on');
+  if(r.trailer){ VID.src=r.trailer; VID.load(); VID.pause(); } else { VID.removeAttribute('src'); }
+  paintF(); stage.classList.add('vc-card'); R.classList.add('on'); hideListen();
+  if(say&&window.speechSynthesis){ try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(r.say); u.lang='en-US'; u.rate=1.02; setTimeout(()=>speechSynthesis.speak(u),700); }catch(e){} } }
+function paintF(){ BTN.forEach((b,i)=>b.classList.toggle('f',i===fi)); }
+function closeResult(watch){
+  R.classList.remove('on'); stage.classList.remove('vc-take','vc-card'); resultOpen=false; st='idle';
+  try{ speechSynthesis.cancel(); }catch(e){} setTimeout(()=>{ try{ VID.pause(); }catch(e){} },850);
+  if(watch&&cur){ setTimeout(()=>{ const r=cur; back={t:r.t,prev:prevItem}; stage.classList.add('vc-nohint'); if(r.cat&&window.LS){ window.LS.play(r.cat); } else if(typeof openPlayer==='function'){ openPlayer({title:r.t,meta:r.meta.replace(/\s+•\s+/g,' • '),badge:null,channel:'',mode:'vod',elapsed:0,duration:7800}); } },420); }
+  else { setTimeout(()=>{ if(typeof hideControls==='function') hideControls(); },300); } }
+
+/* ---- keys ---- */
+window.addEventListener('keydown',e=>{
+  if(e.__ls) return;
+  const k=e.key;
+  if((k==='d'||k==='D')&&!e.metaKey&&!e.ctrlKey&&!e.altKey){ e.preventDefault(); e.stopImmediatePropagation(); if(!e.repeat&&st==='idle'&&!resultOpen){ forceDemo=true; start(); forceDemo=false; setTimeout(release,200); } return; }
+  if((k==='m'||k==='M')&&!e.metaKey&&!e.ctrlKey&&!e.altKey){ e.preventDefault(); e.stopImmediatePropagation(); if(!e.repeat) start(); return; }
+  if((k==='Escape'||k==='Backspace'||k==='Delete')&&back&&!resultOpen&&st==='idle'&&playerOpen()&&$('playerTitle').textContent===back.t&&$('playerControls').classList.contains('hidden')){
+    e.preventDefault(); e.stopImmediatePropagation(); const p=back.prev; back=null; stage.classList.remove('vc-nohint'); if(p&&window.LS) window.LS.play(p,{rec:p.st==='rec'}); return; }
+  if(back&&!resultOpen&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(k)) stage.classList.remove('vc-nohint');
+  if(st==='listen'||st==='think'){ if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' ','Escape','Backspace','Delete'].includes(k)){ e.preventDefault(); e.stopImmediatePropagation(); if(k==='Escape'||k==='Backspace'||k==='Delete'){ clearInterval(demoT); if(rec){ try{rec.abort();}catch(x){} rec=null; } stopMeter(); clearTimeout(capT); st='idle'; RM.classList.remove('live'); hideListen(); } } return; }
+  if(!resultOpen) return;
+  if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' ','Escape','Backspace','Delete'].includes(k)) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const dt=R.classList.contains('dt'), cn=R.classList.contains('cin');
+  if(k==='Escape'||k==='Backspace'||k==='Delete'){ backOne(); return; }
+  if(dt||cn) return;
+  if(k==='ArrowLeft'){ fi=Math.max(0,fi-1); paintF(); } else if(k==='ArrowRight'){ fi=Math.min(BTN.length-1,fi+1); paintF(); }
+  else if(k==='Enter'||k===' ') act(fi);
+},true);
+window.addEventListener('keyup',e=>{ if(e.key==='m'||e.key==='M') release(); },true);
+window.addEventListener('keydown',e=>{ if(e.key==='ArrowUp'&&stage.classList.contains('plx-tray-open')&&!document.querySelector('.plx-chip.f')&&!resultOpen&&st==='idle'){ e.preventDefault(); e.stopImmediatePropagation(); stage.classList.remove('ls-peek'); if(typeof hideControls==='function') hideControls(); } else if(e.key==='ArrowUp'&&stage.classList.contains('plx-tray-open')){ setTimeout(()=>stage.classList.remove('ls-peek'),0); } },true);
+window.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&stage.classList.contains('plx-tray-open')&&document.querySelector('.plx-chip.ask.f')){ e.preventDefault(); e.stopImmediatePropagation(); askFromChip(); } },true);
+function askFromChip(){ if(typeof hideControls==='function') hideControls(); setTimeout(()=>{ start(); setTimeout(release,160); },380); }
+document.addEventListener('click',e=>{ if(e.target.closest&&e.target.closest('.plx-chip.ask')) askFromChip(); });
+(function(){ const row=document.getElementById('moreChips'); const sync=()=>{ const f=row.querySelector('.plx-chip.f'); if(!f){ row.style.transform=''; return; } const x=Math.max(0,f.offsetLeft+f.offsetWidth-(1920-160)); row.style.transform='translateX('+(-x)+'px)'; };
+  new MutationObserver(sync).observe(row,{attributes:true,subtree:true,attributeFilter:['class']}); })();
+BTN.forEach((b,i)=>b.addEventListener('click',()=>{ if(resultOpen){ fi=i; paintF(); act(i); } }));
+R.querySelector('.bkh').addEventListener('click',()=>{ if(resultOpen) backOne(); });
+MICB.addEventListener('pointerdown',e=>{ e.preventDefault(); MICB.setPointerCapture&&MICB.setPointerCapture(e.pointerId); start(); });
+MICB.addEventListener('pointerup',()=>release());
+MICB.addEventListener('pointercancel',()=>release());
+
+new MutationObserver(()=>{ const t=$('playerTitle').textContent; if(back&&t!==back.t) back=null; stage.classList.toggle('vc-nohint',!!back); }).observe($('playerTitle'),{childList:true,characterData:true,subtree:true});
+window.vcBackItem=()=>back&&back.prev;
+/* Digger joins the catalog so "Watch now" can play it like any other title */
+window.addEventListener('load',()=>{ const LS=window.LS; if(LS&&!LS.CAT.find(x=>x.id==='digger')) LS.CAT.push({id:'digger',hidden:true,t:'Digger',kind:'movie',genre:'Comedy',st:'rec',rec:true,rp:0,ch:'',logo:null,img:'cards/digger-poster.png',dur:7800,s:'2026',meta:'2026 • Alejandro G. Iñárritu'}); });
+})();
+</script>
+
+<script>
+/* ===== Zoom-out carousels. Registered BEFORE the core so it sees Up first. Up on the peek -> endless rows; select -> zoom into the choice and play it. ===== */
+(function(){
+const $=id=>document.getElementById(id), stage=$('plxStage'), root=$('ctvPlayerRoot');
+const CW=480,CH=270,STR=530,LX=720,RY=395,ROWH=380,S=1920/CW;
+const g=document.createElement('div'); g.id='lsG'; g.innerHTML='<div class="bk"></div><div class="gx"><div class="rs"></div></div>'; stage.appendChild(g);
+const X0=LX-CW*.22,Y0=RY-CH*.22,HS='translate('+X0+'px,'+Y0+'px) scale(1.44)',HF='translate(0px,0px) scale('+S+')', SP=1689.6/CW, HP='translate(115.2px,64.8px) scale('+SP+')';
+const GX=g.querySelector('.gx'),RS=g.querySelector('.rs');
+let isOn=false,busy=false,ALL=[],FIRST=[],MATCH=new Set(),r=0,rowP={},rowEl={},pvT=0,cur=null;
+const mod=(i,n)=>((i%n)+n)%n;
+const isPt=x=>/^((movies|short-form|voice)\/|cards\/digger)/.test(x.img);
+const ga=x=>'<div class="ga'+(isPt(x)?' pt':'')+'" style="background-image:'+art(x)+';--im:'+art(x)+'"></div>';
+const art=x=>"url('"+(window.LS.url?window.LS.url(x):window.LS.IMG+x.img)+"')";
+function buildDefs(c){
+  const LS=window.LS; ALL=LS.CAT.filter(x=>x.t!==c.t&&!x.hidden);
+  const by={}; ALL.slice().sort((a,b)=>LS.sim(b,c)-LS.sim(a,c)).forEach(x=>{ (by[x.kind]=by[x.kind]||[]).push(x); });
+  const ks=Object.keys(by), mix=[]; for(let i=0;mix.length<ALL.length;i++) ks.forEach(k=>{ if(by[k][i]) mix.push(by[k][i]); });
+  const pin=mix.find(x=>x.id==='tgp'); FIRST=[c].concat(pin?[pin]:[],mix.filter(x=>x!==pin));  /* The Good Place sits right next to the current program */
+  MATCH=new Set(ALL.slice().sort((a,b)=>LS.sim(b,c)-LS.sim(a,c)).slice(0,7).map(x=>x.t));
+}
+function rowItems(rv){
+  if(rv===0) return {a:FIRST};
+  let h=(rv*2654435761)>>>0; const rnd=()=>{ h=(h*1664525+1013904223)>>>0; return h/4294967296; };
+  const a=ALL.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return {a};
+}
+function cellHTML(x,first){ const LS=window.LS; const tag=(first&&x===cur)?'<span class="fc-tag live">LIVE</span>':LS.tags(x);
+  return '<div class="gt">'+tag+'</div>'+ga(x)+'<div class="gi"><div class="t">'+x.t+'</div><div class="s">'+(x.ch?x.ch+' • ':'')+(x.meta||x.s||'')+'</div></div>'; }
+function ensureRow(rv){
+  if(rowEl[rv]) return rowEl[rv];
+  const it=rowItems(rv); const el=document.createElement('div'); el.className='rw dim'; el.style.top=(RY+rv*ROWH)+'px';
+  el.innerHTML='<div class="trk"></div>';
+  RS.appendChild(el); rowEl[rv]={el,trk:el.querySelector('.trk'),it,cells:{}}; if(rowP[rv]==null) rowP[rv]=0; return rowEl[rv]; }
+function fillRow(rv){
+  const R=ensureRow(rv), p=rowP[rv], n=R.it.a.length;
+  for(let v=p-3;v<=p+4;v++){ if(!R.cells[v]){ const x=R.it.a[mod(v,n)], c=document.createElement('div'); c.className='gc'; c.style.left=(LX+v*STR)+'px'; c.innerHTML=cellHTML(x,rv===0&&v===0); c._x=x; R.trk.appendChild(c); R.cells[v]=c; } }
+  Object.keys(R.cells).forEach(k=>{ if(+k<p-4||+k>p+6){ R.cells[k].remove(); delete R.cells[k]; } });
+  R.trk.style.transform='translateX('+(-p*STR)+'px)';
+  Object.keys(R.cells).forEach(k=>{ const c=R.cells[k]; c.classList.toggle('f',rv===r&&+k===p&&isOn); c.classList.toggle('pk',Math.abs(+k-p)>=2); c.classList.toggle('sl',rv===r&&+k<p); c.classList.toggle('sr',rv===r&&+k>p); { const d=+k-p, a=Math.abs(d); c.style.setProperty('--dx',(rv===r&&d!==0?Math.sign(d)*92:0)+'px'); c.style.transitionDelay=(rv===r&&a>=2?'40ms':'0ms'); } });
+}
+function layout(){
+  for(let rv=Math.max(0,r-1);rv<=r+3;rv++){ fillRow(rv); const R=rowEl[rv]; R.el.classList.toggle('past',rv===r-1); R.el.classList.toggle('gone',rv<r-1); R.el.classList.toggle('dim',rv>r); R.el.classList.toggle('cur',rv===r); }
+  Object.keys(rowEl).forEach(k=>{ if(+k<r-2||+k>r+3){ rowEl[k].el.remove(); delete rowEl[k]; } });
+  RS.style.transform='translateY('+(-r*ROWH)+'px)';
+  info();
+}
+function focused(){ const R=rowEl[r]; return R&&R.cells[rowP[r]]; }
+function clearPv(){ document.querySelectorAll('#lsG .gc.pv').forEach(e=>{ e.classList.remove('pv'); const v=e.querySelector('video.pvv'); if(v){ try{v.pause();}catch(_){} v.removeAttribute('src'); v.remove(); } }); }
+function pvPlay(c){ const x=c._x, f=(window.LSCLIPS||{})[x&&x.id]; if(!f||c.querySelector('video.pvv')) return;
+  const v=document.createElement('video'); v.className='pvv'; v.muted=true; v.loop=true; v.playsInline=true; v.preload='auto';
+  v.addEventListener('canplay',()=>v.classList.add('on')); v.addEventListener('timeupdate',()=>{ if(v.currentTime>8) v.currentTime=0; }); v.addEventListener('error',()=>v.remove());
+  v.src='video assets/'+f+'.mp4'; const a=c.querySelector('.ga'); if(a) a.after(v); else c.prepend(v); v.play().catch(()=>{}); }
+function info(){
+  const c=focused(); if(!c) return;
+  clearTimeout(pvT); clearPv();
+  pvT=setTimeout(()=>{ if(!isOn||g.classList.contains('out')) return; if(focused()===c){ c.classList.add('pv'); pvPlay(c); } },1000);
+}
+function hero(x,from,to,r0,r1,ms,ease){
+  const h=document.createElement('div'); h.className='gc gh'; h.style.left='0'; h.style.top='0'; h.style.transformOrigin='0 0';
+  h.innerHTML=ga(x);
+  h.style.transition='none'; h.style.transform=from; h.style.borderRadius=r0; g.appendChild(h); void h.offsetWidth;
+  requestAnimationFrame(()=>{ h.style.transition='transform '+ms+'ms '+ease+',border-radius '+ms+'ms '+ease+',opacity .25s ease'; h.style.transform=to; h.style.borderRadius=r1; });
+  return h; }
+function open(){
+  const LS=window.LS; cur=LS.cur(); if(cur&&cur.hidden) cur=(window.vcBackItem&&window.vcBackItem())||LS.CAT.find(x=>!x.hidden); buildDefs(cur); r=0; rowP={}; rowEl={}; RS.innerHTML='';
+  isOn=true; busy=true; g.classList.remove('in','out','snap'); g.classList.add('on','hold'); stage.classList.add('lsg');
+  GX.style.transformOrigin=(LX+CW/2)+'px '+(RY+CH/2)+'px';
+  GX.style.transition='none'; GX.style.transform='scale(1.06)'; g.style.transition='none'; g.style.opacity='0';
+  layout();
+  const h=hero(cur,HP,HS,'14px','30px',820,'cubic-bezier(.32,.72,0,1)');
+  void GX.offsetWidth;
+  requestAnimationFrame(()=>{ GX.style.transition='transform .82s cubic-bezier(.32,.72,0,1)'; GX.style.transform='none'; g.style.transition='opacity .35s ease'; g.style.opacity='1'; g.classList.add('in'); });
+  setTimeout(()=>{ g.classList.add('snap'); g.classList.remove('hold'); h.style.opacity='0'; if(stage.classList.contains('ls-peek')) stage.classList.remove('ls-peek'); },860);
+  setTimeout(()=>{ h.remove(); g.classList.remove('snap'); busy=false; info(); },1160);
+}
+function zoomIn(play){
+  busy=true; clearTimeout(pvT); const f=focused(), x=f&&f._x;
+  const h=x?hero(x,HS,HF,'30px','0px',720,'cubic-bezier(.4,0,.2,1)'):null;
+  g.classList.add('out','hold'); g.classList.remove('in');
+  GX.style.transition='transform .72s cubic-bezier(.4,0,.2,1)'; GX.style.transform='scale(1.06)';
+  if(play&&x&&x!==window.LS.cur()) setTimeout(()=>window.LS.play(x,{rec:x.st==='rec'}),240);
+  setTimeout(()=>{ stage.classList.remove('lsg'); },640);
+  setTimeout(()=>{ g.style.transition='opacity .45s ease'; g.style.opacity='0'; },680);
+  setTimeout(()=>{ g.classList.remove('on','out','hold'); g.style.opacity=''; g.style.transition=''; if(h) h.remove(); isOn=false; busy=false; clearPv(); },1160);
+}
+function move(k){
+  if(k==='ArrowRight') rowP[r]++; else if(k==='ArrowLeft') rowP[r]--;
+  else if(k==='ArrowDown') r++; else if(k==='ArrowUp'){ if(r===0) return; r--; }
+  layout();
+}
+window.addEventListener('keydown',e=>{
+  if(e.__ls) return;
+  const open_=!!(window.LSC&&window.LSC.isOpen&&window.LSC.isOpen());
+  if(isOn){
+    let k=e.key; if(k==='Delete'||k==='Backspace') k='Escape';
+    if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' ','Escape'].includes(k)) return;
+    e.preventDefault(); e.stopImmediatePropagation(); if(busy) return;
+    if(k==='Escape') zoomIn(false); else if(k==='Enter'||k===' ') zoomIn(true); else move(k);
+    return; }
+  if(e.key==='ArrowUp'&&!open_&&root.classList.contains('open')&&stage.classList.contains('ls-peek')&&window.LS&&window.LS.CAT){ e.preventDefault(); e.stopImmediatePropagation(); open(); }
+},true);
+})();
+</script>
+
+<script>
+(function(){
+const stage=document.getElementById('plxStage');
+const O=document.createElement('div'); O.id='pkO';
+O.innerHTML=['l','r'].map(c=>'<div class="pkI '+c+'"><img alt=""><div class="pkth"></div><div class="pkct"><img alt=""></div><div class="pkfull"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="'+(c==='l'?'M15 5l-7 7 7 7':'M9 5l7 7-7 7')+'"/></svg></div>').join('');
+stage.appendChild(O);
+const TILES={eab:'phi-bears',rvb:'rang-bruins',svc:'swiss-col',sky:'skyfall',yh:'yourhonor'};
+const fill=(el,c)=>{ if(!c) return; const tl=TILES[c.id]; el.classList.toggle('has-tile',!!tl); if(tl) el.querySelector('.pkfull').style.setProperty('--tl',"url('image assets/tiles/"+tl+".png')"); const B=(window.LS&&window.LS.IMG||'image assets/'); el.querySelector(':scope>img').src=B+'channels/'+c.logo+'.png'; el.querySelector('.pkct img').src=B+'channels/'+c.logo+'.png'; el.querySelector('.pkth').style.setProperty('--im',"url('"+B+c.img+"')"); };
+window.pkUpdate=(a,b)=>{ fill(O.querySelector('.l'),a); fill(O.querySelector('.r'),b); };
+stage.dataset.pkv='c';
+})();
+</script>
+<script>
+/* ===== Launch-into-live core: wraps the LOCKED player (openPlayer / closePlayer). No component files modified. ===== */
+(function(){
+const IMG='image assets/', $=id=>document.getElementById(id);
+const CAT=[
+ {id:'rvb',t:'Rangers vs Bruins',kind:'sport',league:'NHL',teams:['Rangers','Bruins'],st:'live',ch:'ESPN',logo:'espn',img:'sports/slate (4).png',score:['3','2nd 12:41','2'],p:.45,dur:10800,fav:true,s:'NHL • ESPN',meta:'NHL • 2nd Period'},
+ {id:'ltr',t:'Lightning vs Rangers',kind:'sport',league:'NHL',teams:['Lightning','Rangers'],st:'soon',time:'9:00pm',ch:'ESPN2',logo:'espn2',img:'sports/slate.png',dur:10800,fav:true,s:'NHL • ESPN2',meta:'NHL • Tonight 9:00pm'},
+ {id:'eab',t:'Eagles vs Bears',kind:'sport',league:'NFL',teams:['Eagles','Bears'],st:'live',ch:'FOX',logo:'fox',img:'sports/slate (5).png',score:['14','Q3 05:12','10'],p:.55,dur:10800,fav:true,s:'NFL • FOX',meta:'NFL • 3rd Quarter'},
+ {id:'dva',t:'Delaware vs Virginia',kind:'sport',league:'NCAAF',teams:['Delaware','Virginia'],st:'live',ch:'ESPN2',logo:'espn2',img:'sports/slate (1).png',score:['21','Q2 03:40','17'],p:.38,dur:10800,s:'NCAAF • ESPN2',meta:'NCAAF • 2nd Quarter'},
+ {id:'aeg',t:'Argentina vs Egypt',kind:'sport',league:'Soccer',teams:['Argentina','Egypt'],st:'live',ch:'fubo Sports Network',logo:null,img:'sports/slate (2).png',score:['1',"82'",'0'],p:.72,dur:6000,s:'International Friendly • fubo Sports Network',meta:"International Friendly • 82'"},
+ {id:'svc',t:'Switzerland vs Colombia',kind:'sport',league:'Soccer',teams:['Switzerland','Colombia'],st:'live',ch:'FS2',logo:'fs2',img:'sports/slate (3).png',score:['2',"77'",'2'],p:.64,dur:6000,s:'International Friendly • FS2',meta:"International Friendly • 77'"},
+ {id:'yh',t:'Your Honor',kind:'show',genre:'Crime drama',st:'live',ch:'USA',logo:'usa',img:'shows/05.png',p:.3,dur:2700,s:'S2 E4 • USA',meta:'S2 E4 • Crime Drama • TV-MA'},
+ {id:'ncis',t:'NCIS',kind:'show',genre:'Crime drama',st:'live',ch:'USA',logo:'usa',img:'shows/23.png',p:.18,dur:2700,rec:true,rp:.6,s:'S22 E19 • USA',meta:'S22 E19 • Crime Drama • TV-14'},
+ {id:'bil',t:'Billions',kind:'show',genre:'Drama',st:'rec',ch:'Showtime',logo:null,img:'shows/02.png',rp:.3,dur:3600,isNew:true,rec:true,s:'S7 E3 • Showtime',meta:'S7 E3 • Drama • TV-MA'},
+ {id:'sky',t:'Skyfall',kind:'movie',genre:'Action',st:'live',ch:'AMC',logo:'amc',img:'movies/03.png',p:.2,dur:8580,s:'2h 23m • 2012 • AMC',meta:'2h 23m • 2012 • PG-13'},
+ {id:'mnk',t:'12 Monkeys',kind:'movie',genre:'Sci-fi',st:'rec',ch:'Sundance TV',logo:null,img:'movies/01.png',rp:.5,dur:7740,rec:true,s:'2h 9m • 1995 • Sundance TV',meta:'2h 9m • 1995 • R'},
+ {id:'jok',t:'Joker',kind:'movie',genre:'Thriller',st:'soon',time:'10:00pm',ch:'AMC',logo:'amc',img:'movies/34.png',dur:7320,s:'2h 2m • 2019 • AMC',meta:'2h 2m • 2019 • R'},
+ {id:'tgp',t:'The Good Place',kind:'show',genre:'Comedy',st:'live',ch:'NBC',logo:'nbc',img:'shows/26.png',p:0.35,dur:2700,s:'S4 E7 • NBC',meta:'S4 E7 • Comedy • TV-PG'},
+ {id:'frn',t:'Friends',kind:'show',genre:'Comedy',st:'live',ch:'TV Land',logo:null,img:'shows/27.png',p:0.5,dur:1800,s:'S5 E14 • TV Land',meta:'S5 E14 • Comedy • TV-14'},
+ {id:'arch',t:'Archer',kind:'show',genre:'Animation',st:'live',ch:'FX',logo:null,img:'shows/22.png',p:0.25,dur:1800,s:'S14 E3 • FX',meta:'S14 E3 • Animated comedy • TV-MA'},
+ {id:'dex',t:'Dexter: New Blood',kind:'show',genre:'Crime drama',st:'live',ch:'Showtime 2',logo:null,img:'shows/03.png',p:0.4,dur:3600,s:'S1 E6 • Showtime 2',meta:'S1 E6 • Thriller • TV-MA'},
+ {id:'snow',t:'Snowfall',kind:'show',genre:'Crime drama',st:'live',ch:'FXX',logo:null,img:'shows/32.png',p:0.2,dur:3600,s:'S5 E2 • FXX',meta:'S5 E2 • Crime drama • TV-MA'},
+ {id:'chi',t:'The Chi',kind:'show',genre:'Drama',st:'live',ch:'BET',logo:null,img:'shows/08.png',p:0.6,dur:3600,s:'S4 E1 • BET',meta:'S4 E1 • Drama • TV-MA'},
+ {id:'aou',t:'Avengers: Age of Ultron',kind:'movie',genre:'Action',st:'live',ch:'TNT',logo:null,img:'movies/07.png',p:0.3,dur:8460,s:'2h 21m • 2015 • TNT',meta:'2h 21m • 2015 • PG-13'},
+ {id:'pulp',t:'Pulp Fiction',kind:'movie',genre:'Crime',st:'live',ch:'MGM+',logo:null,img:'movies/04.png',p:0.45,dur:9240,s:'2h 34m • 1994 • MGM+',meta:'2h 34m • 1994 • R'},
+ {id:'gone',t:'Gone Girl',kind:'movie',genre:'Thriller',st:'live',ch:'Sundance TV',logo:null,img:'movies/02.png',p:0.15,dur:8940,s:'2h 29m • 2014 • Sundance TV',meta:'2h 29m • 2014 • R'},
+ {id:'eeao',t:'Everything Everywhere All at Once',kind:'movie',genre:'Sci-fi',st:'live',ch:'IFC',logo:null,img:'movies/22.png',p:0.55,dur:8340,s:'2h 19m • 2022 • IFC',meta:'2h 19m • 2022 • R'},
+ {id:'shoot',t:'Shooter',kind:'movie',genre:'Action',st:'live',ch:'Starz',logo:null,img:'movies/35.png',p:0.25,dur:7440,s:'2h 4m • 2007 • Starz',meta:'2h 4m • 2007 • R'},
+ {id:'ftft',t:'First Things First',kind:'sport',league:'NFL',genre:'Sports talk',st:'live',ch:'FS1',logo:null,img:'short-form/In-studio/03.png',p:0.3,dur:3600,s:'Studio show • FS1',meta:'Studio show • Sports talk'},
+ {id:'mlbn',t:'MLB Now',kind:'sport',league:'MLB',st:'live',ch:'MLB Network',logo:null,img:'short-form/In-game/01.png',p:0.4,dur:3600,s:'Studio show • MLB Network',meta:'MLB • Studio show'},
+ {id:'twd',t:'The Walking Dead',kind:'show',genre:'Horror',st:'soon',time:'9:00pm',ch:'AMC',logo:'amc',img:'shows/30.png',dur:2700,s:'S11 E24 • AMC',meta:'S11 E24 • Horror • TV-MA'},
+ {id:'tmj',t:"That's My Jam",kind:'show',genre:'Comedy',st:'soon',time:'9:30pm',ch:'NBC',logo:'nbc',img:'shows/34.png',dur:2700,s:'Game show • NBC',meta:'Game show • TV-PG'},
+ {id:'bcs',t:'Better Call Saul',kind:'show',genre:'Drama',st:'rec',rec:true,rp:.2,ch:'AMC',logo:'amc',img:'shows/33.png',dur:3000,s:'S6 E13 • AMC',meta:'S6 E13 • Drama • TV-MA'},
+ {id:'wrex',t:'Welcome to Wrexham',kind:'show',genre:'Documentary',st:'rec',rec:true,rp:.2,ch:'FX',logo:null,img:'shows/35.png',dur:2700,s:'S3 E1 • FX',meta:'S3 E1 • Docuseries • TV-14'},
+ {id:'jum',t:'Jumanji: The Next Level',kind:'movie',genre:'Action',st:'rec',rec:true,rp:.2,ch:'Starz',logo:null,img:'movies/29.png',dur:7380,s:'2h 3m • 2019 • Starz',meta:'2h 3m • 2019 • PG-13'}
+];
+const BY={}; CAT.forEach(x=>BY[x.id]=x);
+/* optional 16:9 replacements for the poster cards: drop files in 'image assets/cards/' (png, jpg or webp) and they are picked up automatically */
+const CARDS={sky:['skyfall.jpg'],mnk:['12-Monkeys-Movie-Poster-1995.jpg'],jok:['joker.jpg'],aou:['avengers.jpg'],pulp:['pulpfiction.jpg'],gone:['gone-girl.webp'],eeao:['everythingeverywhere.jpg'],shoot:['shooter.jpg'],ftft:['firstthingsfirst.jpg'],mlbn:['mlbnow.jpg'],jum:['jumanji.jpg']};
+Object.keys(CARDS).forEach(id=>{ const x=BY[id], L=CARDS[id]; if(!x) return; (function t(i){ if(i>=L.length) return; const im=new Image(); im.onload=()=>{ x.img='cards/'+L[i]; }; im.onerror=()=>t(i+1); im.src='image assets/cards/'+L[i]; })(0); });
+const RING=['yh','rvb','eab','svc','sky'].map(id=>BY[id]);
+let idx=1, ctrlMode=false, pt=0, tt=0;
+const stage=$('plxStage'), root=$('ctvPlayerRoot'), ctrls=$('playerControls');
+const playerOpen=()=>root.classList.contains('open'), ctrlHidden=()=>ctrls.classList.contains('hidden');
+
+/* ---- layers injected into the locked player stage (additive DOM only) ---- */
+const back=document.createElement('div'); back.id='lsBack';
+const nb='<div class="art"></div><div class="shade"></div><img class="logo" alt="">';
+back.innerHTML='<div class="lsN" id="lsNL">'+nb+'</div><div class="lsN" id="lsNR">'+nb+'</div><div id="lsDots"></div>';
+stage.insertBefore(back,stage.firstChild);
+const vid=document.createElement('div'); vid.id='lsVideo'; vid.innerHTML='<div class="art"></div><video muted loop playsinline preload="auto"></video>';
+$('playerBg').after(vid);
+const cRoot=document.createElement('div'); cRoot.id='lsC'; stage.appendChild(cRoot);
+const flash=document.createElement('div'); flash.id='lsFlash'; stage.appendChild(flash);
+const toastEl=document.createElement('div'); toastEl.id='lsToast'; toastEl.className='fc-toast'; stage.appendChild(toastEl);
+
+/* ---- shared helpers used by every exploration ---- */
+const sim=(x,c)=>{ let s=0; (x.teams||[]).forEach(t=>{ if((c.teams||[]).includes(t)) s+=4; }); if(x.league&&x.league===c.league) s+=3; if(x.genre&&x.genre===c.genre) s+=3; if(x.kind===c.kind) s+=1; if(x.st==='live') s+=1; return s; };
+const LS=window.LS={
+  CAT,BY,RING,$,IMG,stage,sim,
+  cur(){ const t=$('playerTitle').textContent; return CAT.find(x=>x.t===t)||RING[idx]; },
+  why(x,c){ const t=(x.teams||[]).find(t=>(c.teams||[]).includes(t)); if(t) return t+' • '+x.league; if(x.league&&x.league===c.league) return 'More '+x.league; if(x.genre&&x.genre===c.genre) return 'More '+x.genre.toLowerCase(); if(x.kind==='sport') return x.st==='soon'?'Coming up in sports':'Live sports'; return x.genre||'Popular'; },
+  lens(id,c){
+    c=c||LS.cur(); const pool=CAT.filter(x=>x.t!==c.t);
+    const fav=(a,b)=>(b.fav?1:0)-(a.fav?1:0), liveFirst=(a,b)=>(b.st==='live'?1:0)-(a.st==='live'?1:0);
+    switch(id){
+      case 'like': return pool.map(x=>({x,s:sim(x,c)})).sort((a,b)=>b.s-a.s).slice(0,7).map(o=>o.x);
+      case 'live': return pool.filter(x=>x.st==='live').sort(fav);
+      case 'soon': return pool.filter(x=>x.st==='soon');
+      case 'sports': return pool.filter(x=>x.kind==='sport').sort(liveFirst);
+      case 'shows': return pool.filter(x=>x.kind!=='sport').sort(liveFirst);
+      case 'rec': return pool.filter(x=>x.rec||x.st==='rec');
+      case 'fav': return pool.filter(x=>x.fav);
+      case 'saved': return pool.filter(x=>x.rec||x.st==='rec'||x.fav);
+    } return [];
+  },
+  tags(x,o){ o=o||{}; const st=o.rec?'rec':x.st;
+    if(st==='live') return '<span class="fc-tag live">LIVE</span>';
+    if(st==='rec') return '<span class="fc-tag rec">REC</span>'+(x.isNew?'<span class="fc-tag new">New</span>':'');
+    return '<span class="fc-tag">'+x.time+'</span>'; },
+  prog(x,o){ o=o||{}; const st=o.rec?'rec':x.st; const v=st==='rec'?(x.rp||x.p):(st==='live'?x.p:0); return v?'<div class="fc-prog '+(st==='rec'?'vod':'')+'"><i style="width:'+v*100+'%"></i></div>':''; },
+  card(x,o){ o=o||{}; const st=o.rec?'rec':x.st;
+    const score=(st==='live'&&x.score)?'<div class="fc-score"><span>'+x.score[0]+'</span><span class="clk">'+x.score[1]+'</span><span>'+x.score[2]+'</span></div>':'';
+    const sub=o.sub!=null?o.sub:x.s;
+    return '<div class="fc-card '+(o.cls||'')+'" data-id="'+x.id+'"><div class="fc-tw"><div class="fc-thumb" style="background-image:url(\''+IMG+x.img+'\')"><div class="fc-tags">'+LS.tags(x,o)+'</div>'+score+LS.prog(x,o)+'</div><div class="fc-ring"></div></div><div class="fc-foot"><div class="fc-t">'+x.t+'</div><div class="fc-s">'+sub+'</div></div></div>'; },
+  rowHTML(x,o){ o=o||{}; const sub=o.sub!=null?o.sub:x.s;
+    return '<div class="fc-list-row" data-id="'+x.id+'"><div class="th" style="background-image:url(\''+IMG+x.img+'\')">'+LS.tags(x,o)+LS.prog(x,o)+'</div><div class="tx"><div class="tt">'+x.t+'</div><div class="ss">'+sub+'</div></div></div>'; },
+  guideSVG(sz){ return document.querySelector('.ctv-player-icon-btn[data-action="miniguide"] svg').outerHTML.replace('width="34" height="34"','width="'+sz+'" height="'+sz+'"'); },
+  mode(on){ stage.classList.toggle('lsc-open',!!on); },
+  exit(){ window.LSC.close(); setTimeout(()=>{ const s=new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true,cancelable:true}); s.__ls=1; window.dispatchEvent(s); },0); },   /* back to the player; its own handler re-shows the controls */
+  toast(m,ms,ok){ toastEl.textContent=m; toastEl.classList.toggle('ok',!!ok); toastEl.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>toastEl.classList.remove('show'),ms||3200); },
+  play(x,o){ o=o||{}; const st=o.rec?'rec':x.st, dur=x.dur||2700;
+    const el=st==='rec'?(x.rp||x.p||0)*dur:(st==='soon'?0:(x.p||.15)*dur);
+    ctrlMode=false;
+    openPlayer({title:x.t,meta:x.meta||x.s,badge:st==='live'?'live':st==='rec'?'rec':null,channel:x.ch,mode:st==='rec'?'vod':'live',elapsed:Math.max(el,0),duration:dur});
+    setArt(x.t); doFlash(); const i=RING.indexOf(x); if(i>=0){ idx=i; } paintNb(); },
+};
+
+function doFlash(){ flash.style.transition='none'; flash.style.opacity='.75'; requestAnimationFrame(()=>requestAnimationFrame(()=>{ flash.style.transition='opacity .4s ease'; flash.style.opacity='0'; })); }
+/* ---- live-video clips: 8s silent loops in 'video assets/' (card id -> file name; a missing file just falls back to the still) ---- */
+const CLIPS={digger:'digger',yh:'yourhonor',rvb:'bruins',svc:'colombia',eab:'eagles',frn:'friends',sky:'skyfall',tgp:'thegoodplace',twd:'thewalkingdead'};
+window.LSCLIPS=CLIPS;
+const vEl=vid.querySelector('video');
+vEl.addEventListener('canplay',()=>{ if(vEl.dataset.f) vEl.classList.add('on'); });
+vEl.addEventListener('error',()=>vEl.classList.remove('on'));
+vEl.addEventListener('timeupdate',()=>{ if(vEl.currentTime>8) vEl.currentTime=0; });
+function setClip(x){ const f=x&&CLIPS[x.id];
+  if(!f){ vEl.classList.remove('on'); vEl.pause(); vEl.removeAttribute('src'); vEl.dataset.f=''; return; }
+  if(vEl.dataset.f===f){ vEl.classList.add('on'); vEl.play().catch(()=>{}); return; }
+  vEl.classList.remove('on'); vEl.dataset.f=f; vEl.src='video assets/'+f+'.mp4'; vEl.load(); vEl.play().catch(()=>{}); }
+function setArt(title){ const x=CAT.find(c=>c.t===title); if(x){ setClip(x); const a=vid.firstChild; a.style.backgroundImage="url('"+IMG+x.img+"')"; a.style.setProperty('--im',"url('"+IMG+x.img+"')"); a.classList.toggle('pt',/^((movies|short-form|voice)\/|cards\/digger)/.test(x.img)); } }
+function fillNb(el,c){ el.querySelector('.art').style.backgroundImage="url('"+IMG+c.img+"')"; el.querySelector('.logo').src=IMG+'channels/'+c.logo+'.png'; }
+function paintNb(){ const n=RING.length; fillNb($('lsNL'),RING[(idx-1+n)%n]); fillNb($('lsNR'),RING[(idx+1)%n]); $('lsDots').innerHTML=RING.map((_,k)=>'<i class="'+(k===idx?'on':'')+'"></i>').join(''); if(window.pkUpdate) window.pkUpdate(RING[(idx-1+n)%n],RING[(idx+1)%n]); }
+const conceptOpen=()=>!!(window.LSC&&window.LSC.isOpen());
+function peek(ms){ if(ctrlMode||conceptOpen()) return; stage.classList.add('ls-peek'); clearTimeout(pt); pt=setTimeout(()=>stage.classList.remove('ls-peek'),ms||4200); }
+function unpeek(){ clearTimeout(pt); if(stage.classList.contains('ls-peek')) stage.classList.remove('ls-peek'); }  /* guard: unconditional class writes can re-trigger observers */
+function tune(i){ idx=(i+RING.length)%RING.length; LS.play(RING[idx]); }
+
+/* no explorations in this build: the browse view (Up on the peek) is the only layer on top of the player */
+window.LSC={open(){},close(){},isOpen(){return false},key(){}};
+
+/* keep layer state in sync with the locked player */
+const syncScrim=()=>{ const h=ctrlHidden(); if(h) ctrlMode=false; stage.classList.toggle('lsc-clear',h); };
+new MutationObserver(syncScrim).observe(ctrls,{attributes:true,attributeFilter:['class']});
+syncScrim();
+new MutationObserver(()=>{ if(!playerOpen()){ unpeek(); ctrlMode=false; if(window.LSC&&window.LSC.close) window.LSC.close(true); setTimeout(()=>{ if(!playerOpen()) tune(idx); },60); } }).observe(root,{attributes:true,attributeFilter:['class']});
+new MutationObserver(()=>{ setArt($('playerTitle').textContent); const i=RING.findIndex(c=>c.t===$('playerTitle').textContent); if(i>=0&&i!==idx){ idx=i; paintNb(); } }).observe($('playerTitle'),{childList:true,characterData:true,subtree:true});
+
+/* ---- D-pad. Registered BEFORE the home and player handlers so this layer sees keys first ---- */
+window.addEventListener('keydown',e=>{
+  if(e.__ls) return;
+  if(!playerOpen()) return;
+  let k=e.key; if(k==='Delete') k='Escape';
+  const C=window.LSC;
+  if(C&&C.isOpen()){
+    if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' ','Escape','Backspace'].includes(k)) return;
+    e.preventDefault(); e.stopImmediatePropagation(); C.key(k==='Backspace'?'Escape':(k===' '?'Enter':k)); return;
+  }
+  if((k==='ArrowLeft'||k==='ArrowRight')&&!ctrlMode&&!stage.classList.contains('plx-tray-open')){ e.preventDefault(); e.stopImmediatePropagation(); tune(idx+(k==='ArrowRight'?1:-1)); peek(4500); return; }
+  if(k==='ArrowDown'){
+    const wasPeek=stage.classList.contains('ls-peek'); unpeek();
+    if(ctrlHidden()) return;                                 /* 1st Down: let the locked player reveal its controls */
+    if(wasPeek){ ctrlMode=false; e.preventDefault(); e.stopImmediatePropagation(); return; }   /* Down out of the peek: player in focus first */
+    return;                                                   /* further Down: the locked player handles it */
+  }
+  if(k==='Enter'||k===' '){ ctrlMode=true; unpeek(); return; }
+  if(k==='ArrowUp'){ peek(4200); return; }
+  if(k==='Escape'||k==='Backspace'){ e.preventDefault(); e.stopImmediatePropagation(); unpeek(); ctrlMode=false; if(!ctrlHidden()&&typeof hideControls==='function') hideControls(); return; }   /* Back: controls -> clean video; on clean video stay (no homepage in this flow) */   /* Back on clean video: stay on the player (no homepage in this flow) */
+},true);
+
+window.addEventListener('load',()=>{ setTimeout(()=>{
+  tune(1); peek(5200);                                   /* Resume last channel (Rangers vs Bruins) */
+  if(window.__lsTest) window.__lsTest.forEach((k,i)=>setTimeout(()=>window.dispatchEvent(new KeyboardEvent('keydown',{key:k,bubbles:true,cancelable:true})),1300+i*450));
+},120); });
+})();
+</script>
+
+<script>
+const IMG='image assets/';
+const S=n=>IMG+'shows/'+n+'.png', M=n=>IMG+'movies/'+n+'.png', SP=n=>IMG+'sports/'+n+'.png', SF=n=>IMG+'short-form/'+n+'.png';
+const DESC='Stream it live or on demand with Fubo. Pick up where you left off on any device.';
+const ROWS=[
+ {id:'live',title:null,kind:'',items:[
+  {t:'Ad Astra',s:'2h 20m • 2019 • PG-13',img:M('01'),pos:1,tag:'live',p:.12,ch:'FOX',type:'movie',d:'Astronaut Roy McBride undertakes a mission across an unforgiving solar system to uncover the truth about his missing father.'},
+  {t:'Skyfall',s:'2h 23m • 2012 • PG-13',img:M('03'),pos:1,tag:'live',p:.2,ch:'AMC',type:'movie'},
+  {t:'Law & Order: SVU',s:'S24 E5',img:S('05'),tag:'live',p:.3,ch:'USA',type:'show'},
+  {t:'Boston College at Florida State',s:'NCAAF',img:SP('slate (1)'),tag:'live',p:.15,ch:'ESPN2',type:'sport'},
+  {t:'Gladiator',s:'2h 35m • 2000 • R',img:M('23'),pos:1,tag:'live',p:.4,ch:'AMC',type:'movie'},
+  {t:'Joker',s:'2h 2m • 2019 • R',img:M('34'),pos:1,tag:'live',p:.1,ch:'AMC',type:'movie'}]},
+ {id:'sports',title:'Popular sports',items:[
+  {t:"Men's Women's First Round",s:'US Open Tennis',img:SP('slate'),tag:'time:3:30pm',ch:'ESPN',type:'sport'},
+  {t:'Wisla Plock vs Zaglebie Lubin',s:'Ekstraklasa Soccer',img:SP('slate (2)'),tag:'time:3:30pm',ch:'ESPN2',type:'sport'},
+  {t:'2025 Women\'s Professional Billiards',s:'Billiards',img:SP('slate (3)'),tag:'time:3:30pm',ch:'ESPN',type:'sport'},
+  {t:'Newcastle United FC vs Liverpool',s:'English Premier League',img:SP('slate (4)'),tag:'time:3:30pm',ch:'ESPN2',type:'sport'},
+  {t:'Philadelphia Eagles at Chicago Bears',s:'NFL',img:SP('slate (5)'),tag:'time:8:20pm',ch:'ESPN',type:'sport'}]},
+ {id:'left',title:'Where you left off',kind:'lg',items:[
+  {t:'Minnesota Timberwolves vs Detroit Pistons',s:'NBA',img:SP('slate (4)'),tag:'live',p:.18,ch:'ESPN',type:'sport'},
+  {t:'Mission: Impossible - Fallout',s:'2h 21m • 2018 • PG-13',img:M('08'),pos:1,tag:'live',p:.18,ch:'FOX',type:'movie'},
+  {t:'NCIS',s:'S22 E19 Irreconcilable Differences',img:S('10'),tag:'live',p:.18,ch:'USA',type:'show'}]},
+ {id:'roundup',title:'Sports roundup',kind:'clip',items:[
+  {t:'First Take',s:'ESPN',img:SF('In-studio/01'),tag:'time:3:30pm',ch:'ESPN',type:'clip'},
+  {t:'NFL Live',s:'ESPN',img:SF('In-studio/02'),tag:'time:3:30pm',ch:'ESPN',type:'clip'},
+  {t:'First Things First',s:'FS2',img:SF('In-studio/03'),tag:'time:3:30pm',ch:'FS2',type:'clip'},
+  {t:'MLB Now',s:'FS2',img:SF('In-game/01'),tag:'time:3:30pm',ch:'FS2',type:'clip'},
+  {t:'Intentional Talk',s:'FS2',img:SF('In-game/02'),tag:'time:3:30pm',ch:'FS2',type:'clip'},
+  {t:'Get Up',s:'ESPN',img:SF('In-game/03'),tag:'time:3:30pm',ch:'ESPN',type:'clip'}]},
+ {id:'comedy',title:'Popular comedy series',items:[
+  {t:'The Big Bang Theory',s:'Comedy',img:S('11'),tag:'time:3:30pm',ch:'FOX',type:'show'},
+  {t:'Roseanne',s:'Comedy',img:S('12'),tag:'time:3:30pm',ch:'USA',type:'show'},
+  {t:"America's Funniest Home Videos",s:'Comedy',img:S('13'),tag:'time:3:30pm',ch:'FOX',type:'show'},
+  {t:'Family Guy',s:'Comedy',img:S('14'),tag:'time:3:30pm',ch:'FOX',type:'show'},
+  {t:'Archer',s:'Comedy',img:S('22'),tag:'time:3:30pm',ch:'FOX',type:'show'},
+  {t:'The Good Place',s:'Comedy',img:S('26'),tag:'time:3:30pm',ch:'NBC',type:'show'}]}
+];
+const $=id=>document.getElementById(id);
+let r=0,c=[0,0,0,0,0],zone='feed',detailItem=null,detailZone='play';
+const feed=$('feed'), inList={}, rowTop=[], rowH=[];
+function tagHTML(it){
+  if(!it.tag) return '';
+  if(it.tag==='live') return '<div class="fc-tags"><span class="fc-tag live">LIVE</span></div>';
+  if(it.tag.startsWith('time:')) return `<div class="fc-tags"><span class="fc-tag">${it.tag.slice(5)}</span></div>`;
+  return '';
+}
+function render(){
+  let y=620;
+  feed.innerHTML=ROWS.map((row,ri)=>{
+    const top=y; rowTop[ri]=top;
+    const h=row.kind==='lg'?(row.title?400:0)+300:row.kind==='clip'?320:340;
+    y+=(row.title?60:0)+(ri===0?230:h-20)+64;
+    return `<div class="sec" data-r="${ri}" style="top:${top}px">${row.title?`<div class="fc-section-title">${row.title}</div>`:''}<div class="rowclip"><div class="rtrack">${row.items.map((it,i)=>`<div class="fc-card ${row.kind}" data-r="${ri}" data-i="${i}"><div class="fc-tw"><div class="fc-thumb${it.pos?' pos':''}" style="background-image:url('${it.img}')">${tagHTML(it)}${it.p?`<div class="fc-prog${it.tag==='live'?'':' vod'}"><i style="width:${it.p*100}%"></i></div>`:''}</div><div class="fc-ring"></div></div>${row.kind==='clip'?'':`<div class="fc-foot"><div class="fc-t">${it.t}</div><div class="fc-s">${it.s}</div></div>`}</div>`).join('')}</div></div></div>`;
+  }).join('');
+  let yy=620; ROWS.forEach((_,i)=>{ const s=feed.children[i]; s.style.top=yy+'px'; rowTop[i]=yy; yy+=s.offsetHeight+64; });
+  feed.style.height=yy+'px';
+}
+function paint(){
+  document.querySelectorAll('.fc-card').forEach(e=>e.classList.toggle('f',zone==='feed'&&+e.dataset.r===r&&+e.dataset.i===c[r]));
+  const tr=feed.children[r].querySelector('.rtrack'), card=tr.children[c[r]];
+  tr.style.transform=`translateX(${-Math.max(0,card.offsetLeft-card.offsetWidth*0)+0*0 - 0}px)`.replace(/-(\d+)/,(m,n)=>'-'+Math.max(0,+n-0));
+  // keep focused card at the left edge once scrolled past the first 3
+  const shift=Math.max(0,c[r]-2)*(card.offsetWidth+32);
+  tr.style.transform=`translateX(${-shift}px)`;
+  // vertical scroll: row 0 shows hero; later rows slide up
+  const ty=r===0?0:-(rowTop[r]-(ROWS[r].title?150:620));
+  feed.style.transform=`translateY(${ty}px)`;
+  $('hero').style.transform=`translateY(${Math.min(0,ty)}px)`;
+  $('hero').style.opacity=r===0?1:Math.max(0,1+ty/700);
+  $('hClock').style.opacity=r===0?1:0;
+  if(r===0) setHero(ROWS[0].items[c[0]]);
+}
+function setHero(it){
+  $('hero').style.backgroundImage=`url('${it.img}')`;
+  $('hFlag').textContent=''; $('hTitle').textContent=it.t; $('hMeta').textContent=it.s; $('hDesc').textContent=it.d||DESC;
+}
+function openDetail(it){
+  detailItem=it; zone='detail'; detailZone='play';
+  $('dHero').style.backgroundImage=`url('${it.img}')`; $('dHero').style.backgroundPosition=it.pos?'center 25%':'center';
+  $('dFlag').textContent=it.tag==='live'?'LIVE':it.type==='sport'?'SPORTS':it.type==='movie'?'MOVIE':it.type==='clip'?'CLIP':'SHOW';
+  $('dTitle').textContent=it.t; $('dMeta').textContent=it.s; $('dDesc').textContent=it.d||DESC;
+  $('dPlay').querySelector('span').textContent=it.p&&it.tag!=='live'?'Resume':'Play';
+  $('dListTxt').textContent=inList[it.t]?'Remove from Watchlist':'Add to Watchlist';
+  $('detail').classList.add('open'); paintDetail();
+}
+function paintDetail(){ $('dPlay').classList.toggle('f',detailZone==='play'); $('dList').classList.toggle('f',detailZone==='list'); }
+function closeDetail(){ $('detail').classList.remove('open'); zone='feed'; detailItem=null; paint(); }
+function play(it){
+  const live=it.tag==='live', dur=it.type==='movie'?8400:it.type==='sport'?10800:2700;
+  openPlayer({title:it.t,meta:it.s,badge:live?'live':null,channel:it.ch,mode:live?'live':'vod',elapsed:(it.p||0)*dur,duration:dur});
+}
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toast.h); toast.h=setTimeout(()=>t.classList.remove('show'),1800); }
+function navigateToPage(id){
+  const home=id==='home';
+  $('pageHome').classList.toggle('hide',!home);
+  $('soon').style.display=home?'none':'flex';
+  if(!home) $('soon').textContent=({search:'Search',guide:'Guide',mystuff:'My Stuff',sports:'Sports',shows:'Shows',movies:'Movies'})[id]+' — Coming soon';
+}
+/* Back keys: Delete and Backspace act as Escape (= Back) everywhere, including the locked player and navbar. */
+window.addEventListener('keydown',function(e){ if(e.key==='Delete'&&!e.__back){ e.preventDefault(); e.stopImmediatePropagation(); const b=new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}); b.__back=1; (document.body).dispatchEvent(b); } },true);
+/* expand the navbar whenever any nav item has focus (locked navbar.js only expands on the profile) */
+const _upd=updateNavUI; updateNavUI=function(){ _upd(); if(navFocusZone==='nav') navbar.classList.add('expanded'); };
+const _exit=exitCtvNav; exitCtvNav=function(){ _exit(); navFocusZone='locked'; };
+document.querySelectorAll('.ctv-nav-item').forEach(i=>i.classList.toggle('active',i.dataset.page==='home'));
+navFocusZone='locked';
+const playerRoot=document.getElementById('ctvPlayerRoot');
+window.addEventListener('keydown',e=>{
+  if(playerRoot.classList.contains('open')||navFocusZone!=='locked') return;
+  const k=e.key; if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' ','Escape','Backspace'].includes(k)) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if($('soon').style.display==='flex'){ if(k==='ArrowLeft'||k==='Escape'||k==='Backspace') enterCtvNav(); return; }
+  if(zone==='detail'){
+    if(k==='Escape'||k==='Backspace') closeDetail();
+    else if(k==='ArrowDown') detailZone='list'; else if(k==='ArrowUp') detailZone='play';
+    else if(k==='Enter'||k===' '){
+      if(detailZone==='play') play(detailItem);
+      else { const it=detailItem; inList[it.t]=!inList[it.t]; $('dListTxt').textContent=inList[it.t]?'Remove from Watchlist':'Add to Watchlist'; toast(inList[it.t]?'Added to Watchlist':'Removed from Watchlist'); }
+    }
+    paintDetail(); return;
+  }
+  const n=ROWS[r].items.length;
+  if(k==='ArrowRight') c[r]=Math.min(n-1,c[r]+1);
+  else if(k==='ArrowLeft'){ if(c[r]===0) enterCtvNav(); else c[r]--; }
+  else if(k==='ArrowDown'){ if(r<ROWS.length-1){ r++; c[r]=Math.min(c[r],ROWS[r].items.length-1); } }
+  else if(k==='ArrowUp'){ if(r>0){ r--; } }
+  else if(k==='Escape'||k==='Backspace'){ if(r>0){ r=0; } else enterCtvNav(); }
+  else if(k==='Enter'||k===' '){ const it=ROWS[r].items[c[r]]; if(it.tag==='live') play(it); else openDetail(it); }
+  paint();
+},true);
+feed.addEventListener('click',e=>{ const d=e.target.closest('.fc-card'); if(!d) return; r=+d.dataset.r; c[r]=+d.dataset.i; paint(); window.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'})); });
+/* ---- stage fit (1920x1080) ---- */
+function fitStage(){ const s=Math.min(innerWidth/1920,innerHeight/1080), st=$('stage'); st.style.transform=`scale(${s})`; st.style.left=(innerWidth-1920*s)/2+'px'; st.style.top=(innerHeight-1080*s)/2+'px'; }
+addEventListener('resize',fitStage); fitStage();
+render(); paint();
+$('feed').classList.add('skel'); setTimeout(()=>$('feed').classList.remove('skel'),700);
+</script>
+<script>
+(function () {
+/* ====== CTV VIDEO PLAYER — DATA-DRIVEN ====== */
+const CH = { 'Disney Jr.':'disney', 'ESPN':'espn', 'ESPN2':'espn2', 'FOX':'fox', 'AMC':'amc', 'NBC':'nbc', 'USA':'usa', 'Hallmark':'hallmark', 'Nick Jr.':'nick-jr', 'FS2':'fs2' };
+const IMGBASE = 'image assets/';
+const MORE_LIVE = [
+  { t:'Argentina vs Egypt',  s:'International Friendly • fubo Sports Network', img:'sports/slate (2).png', tag:'live', score:['1',"82'",'0'], p:.72, channel:'fubo Sports Network', meta:"International Friendly • 82'" },
+  { t:'Switzerland vs Colombia', s:'International Friendly • FOX Sports 2', img:'sports/slate (3).png', tag:'live', score:['2',"77'",'2'], p:.64, channel:'FS2', meta:"International Friendly • 77'" },
+  { t:'Rangers vs Bruins', s:'NHL • ESPN', img:'sports/slate (4).png', tag:'live', score:['3','2nd 12:41','2'], p:.45, channel:'ESPN', meta:'NHL • 2nd Period' },
+  { t:'Eagles vs Bears', s:'NFL • FOX', img:'sports/slate (5).png', tag:'rec', score:['14','Q3 05:12','10'], p:.55, channel:'FOX', meta:'NFL • 3rd Quarter', badge:'rec' },
+  { t:'Lightning vs Rangers', s:'NHL • ESPN2', img:'sports/slate.png', tag:'time', time:'9:00pm', p:0, channel:'ESPN2', meta:'NHL • Tonight 9:00pm', badge:null },
+  { t:'Billions', s:'S7 E3 • Showtime', img:'shows/02.png', tag:'rec', extra:'New', p:.3, channel:'Showtime', meta:'S7 E3 • Drama • TV-MA', badge:'rec' }
+];
+const CHIPS = ['Ask Fubo','Recommended','All','Favorites','Trending','4K','Live Sports','Soccer','PPV'];
+const CHECK = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7.5 12.5l3 3 6-6.5" stroke="#10121a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+const $ = id => document.getElementById(id);
+const root = $('ctvPlayerRoot'), ctvPlayer = $('ctvPlayer'), stage = $('plxStage'), playerControls = $('playerControls'), playerHint = $('playerHint');
+const progressPlayed = $('progressPlayed'), badgeLive = $('badgeLive'), badgeRec = $('badgeRec'), channelLogo = $('channelLogo');
+const playerTitle = $('playerTitle'), playerMeta = $('playerMeta'), playerBg = $('playerBg');
+const moreTrack = $('moreTrack'), moreChips = $('moreChips');
+const pillEls = [...document.querySelectorAll('.ctv-player-pillbtn')];
+const iconBtnEls = [...document.querySelectorAll('.ctv-player-icon-btn')];
+
+function fit() {
+  const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+  stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
+}
+addEventListener('resize', fit); fit();
+
+/* Build the More Live TV cards (same anatomy as CTV home cards) */
+function buildMore() {
+  moreTrack.innerHTML = MORE_LIVE.map((x, i) => {
+    let tags = '';
+    if (x.tag === 'live') tags = '<span class="plx-tag live">LIVE</span>';
+    else if (x.tag === 'rec') tags = '<span class="plx-tag rec">REC</span>' + (x.extra ? `<span class="plx-tag new">${x.extra}</span>` : '');
+    else if (x.tag === 'time') tags = `<span class="plx-tag time">${x.time}</span>`;
+    const score = x.score ? `<div class="plx-score"><span>${x.score[0]}</span><span class="plx-clk">${x.score[1]}</span><span>${x.score[2]}</span></div>` : '';
+    const prog = x.p ? `<div class="plx-prog"><i style="width:${x.p*100}%"></i></div>` : '';
+    return `<div class="plx-card" data-i="${i}"><div class="plx-tw"><div class="plx-thumb" style="background-image:url('${IMGBASE + x.img}')"><div class="plx-tags">${tags}</div>${score}${prog}</div><div class="plx-ring"></div></div><div class="plx-foot"><div class="plx-t">${x.t}</div><div class="plx-s">${x.s}</div></div></div>`;
+  }).join('');
+  moreChips.innerHTML = CHIPS.map((c, i) => i===0 ? `<div class="plx-chip ask" data-i="0"><svg class="aw" width="32" height="32" viewBox="0 0 27 29" fill="none"><path d="M12 27.3333V1.33333C12 0.596954 12.597 6.87204e-07 13.3333 0C14.0697 0 14.6667 0.596954 14.6667 1.33333V27.3333C14.6667 28.0697 14.0697 28.6667 13.3333 28.6667C12.597 28.6667 12 28.0697 12 27.3333ZM6 23.3333V5.33333C6 4.59695 6.59695 4 7.33333 4C8.06971 4 8.66667 4.59695 8.66667 5.33333V23.3333C8.66667 24.0697 8.06971 24.6667 7.33333 24.6667C6.59695 24.6667 6 24.0697 6 23.3333ZM18 20.3333V8.33333C18 7.59695 18.597 7 19.3333 7C20.0697 7 20.6667 7.59695 20.6667 8.33333V20.3333C20.6667 21.0697 20.0697 21.6667 19.3333 21.6667C18.597 21.6667 18 21.0697 18 20.3333ZM0 17.3333V11.3333C0 10.597 0.596954 10 1.33333 10C2.06971 10 2.66667 10.597 2.66667 11.3333V17.3333C2.66667 18.0697 2.06971 18.6667 1.33333 18.6667C0.596954 18.6667 0 18.0697 0 17.3333ZM24 15.3333V13.3333C24 12.597 24.597 12 25.3333 12C26.0697 12 26.6667 12.597 26.6667 13.3333V15.3333C26.6667 16.0697 26.0697 16.6667 25.3333 16.6667C24.597 16.6667 24 16.0697 24 15.3333Z" fill="currentColor"/></svg><span>${c}</span></div>` : `<div class="plx-chip" data-i="${i}"><span>${c}</span></div>`).join('');
+}
+buildMore();
+const moreCardEls = [...document.querySelectorAll('.plx-card')];
+const chipEls = [...document.querySelectorAll('.plx-chip')];
+
+let zone = 'pills', pillIdx = 0, iconIdx = 0, moreIdx = 0, chipIdx = 0, lastTop = 'pills';
+let controlsVisible = true, hideTimer = null, progressTimer = null, playerIsOpen = false, playerMode = 'live';
+let trayOpen = false, currentDuration = 2160, progress = 15, selectedChip = -1;
+
+/* openPlayer(config) — call from any card's Enter handler.
+   config = { title, meta, badge:'live'|'rec'|null, channel, mode:'live'|'vod', bgColor, elapsed, duration } */
+function openPlayer(config = {}) {
+  playerTitle.textContent = config.title || 'Untitled';
+  playerMeta.textContent = config.meta || '';
+  const key = CH[config.channel];
+  channelLogo.innerHTML = config.channel ? (key ? `<img src="${IMGBASE}channels/${key}.png" alt="${config.channel}">` : config.channel) : '';
+  playerMode = config.mode || 'live';
+  badgeLive.style.display = config.badge === 'live' ? 'flex' : 'none';
+  badgeRec.style.display = config.badge === 'rec' ? 'flex' : 'none';
+  progressPlayed.className = 'ctv-player-progress-played ' + (playerMode === 'live' ? 'live' : 'vod');
+  const live = playerMode === 'live';
+  $('btnStartOver').style.display = live ? 'flex' : 'none';
+  $('btnGoLive').style.display = live ? 'flex' : 'none';
+  currentDuration = config.duration || 2160;
+  progress = config.elapsed ? config.elapsed / currentDuration * 100 : (live ? 15 : 0);
+  playerBg.style.background = config.bgColor
+    ? `linear-gradient(135deg, ${config.bgColor} 0%, #0b0d14 60%)`
+    : 'linear-gradient(135deg, #12151f 0%, #0b0d14 55%, #0f1320 100%)';
+  zone = 'pills'; pillIdx = 0; iconIdx = 0; controlsVisible = true;
+  playerControls.classList.remove('hidden');
+  closeMoreTv(); updateProgressDisplay(); updatePlayerFocus();
+  root.classList.add('open'); fit(); playerIsOpen = true;
+  playerHint.classList.remove('fade-out'); setTimeout(() => playerHint.classList.add('fade-out'), 4000);
+  clearInterval(progressTimer);
+  progressTimer = setInterval(() => { progress = Math.min(100, progress + 0.08); updateProgressDisplay(); }, 1000);
+  resetHideTimer();
+}
+function closePlayer() { root.classList.remove('open'); playerIsOpen = false; clearInterval(progressTimer); clearTimeout(hideTimer); closeMoreTv(); }
+
+function fmt(sec) { return Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0'); }
+function updateProgressDisplay() {
+  progressPlayed.style.width = progress + '%';
+  const el = $('timeElapsed');
+  el.textContent = fmt(progress * currentDuration / 100);
+  el.style.left = progress + '%';
+  $('timeRemaining').textContent = '-' + fmt((100 - progress) * currentDuration / 100);
+}
+
+function openMoreTv() { trayOpen = true; stage.classList.add('plx-tray-open'); }
+function closeMoreTv() { trayOpen = false; stage.classList.remove('plx-tray-open'); }
+
+function visiblePills() { return pillEls.filter(e => e.style.display !== 'none'); }
+function scrollMore() {
+  const x = Math.max(0, moreIdx - 3) * (376 + 32);
+  moreTrack.style.transform = `translateX(${-x}px)`;
+}
+function updatePlayerFocus() {
+  [...pillEls, ...iconBtnEls, ...moreCardEls, ...chipEls].forEach(e => e.classList.remove('f', 'focused'));
+  const vp = visiblePills();
+  if (zone === 'pills' && !vp.length) { zone = 'icons'; iconIdx = 0; }
+  if (zone === 'pills') vp[Math.min(pillIdx, vp.length - 1)].classList.add('focused');
+  else if (zone === 'icons') iconBtnEls[iconIdx].classList.add('focused');
+  else if (zone === 'moretv') moreCardEls[moreIdx].classList.add('f');
+  else if (zone === 'chips') chipEls[chipIdx].classList.add('f');
+}
+function selectChip(i) {
+  if (i === 0) return;
+  selectedChip = i;
+  chipEls.forEach((c, j) => { if (j === 0) return; c.classList.toggle('on', j === i); c.innerHTML = (j === i ? CHECK : '') + `<span>${CHIPS[j]}</span>`; });
+}
+function playCard(i) {
+  const x = MORE_LIVE[i];
+  openPlayer({ title: x.t, meta: x.meta, badge: x.badge === undefined ? 'live' : x.badge, channel: x.channel, mode: 'live', elapsed: Math.max(300, (x.p || .15) * 2160) });
+}
+
+function showControls() { controlsVisible = true; playerControls.classList.remove('hidden'); resetHideTimer(); }
+function hideControls() { controlsVisible = false; playerControls.classList.add('hidden'); closeMoreTv(); zone = 'pills'; pillIdx = 0; updatePlayerFocus(); }
+function resetHideTimer() { clearTimeout(hideTimer); hideTimer = setTimeout(hideControls, 6000); }
+
+window.addEventListener('keydown', e => {
+  if (!playerIsOpen) return;
+  e.stopImmediatePropagation();
+  if (!controlsVisible) { e.preventDefault(); showControls(); return; }
+  showControls();
+  const vp = visiblePills(), k = e.key;
+  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter',' ','Escape','Backspace'].includes(k)) e.preventDefault();
+  switch (k) {
+    case 'Escape': case 'Backspace':
+      if (trayOpen) { closeMoreTv(); zone = lastTop; } else closePlayer();
+      break;
+    case 'ArrowLeft':
+      if (zone === 'pills') pillIdx = Math.max(0, pillIdx - 1);
+      else if (zone === 'icons') { if (iconIdx === 0 && vp.length) { zone = 'pills'; pillIdx = vp.length - 1; } else iconIdx = Math.max(0, iconIdx - 1); }
+      else if (zone === 'moretv') { moreIdx = Math.max(0, moreIdx - 1); scrollMore(); }
+      else if (zone === 'chips') chipIdx = Math.max(0, chipIdx - 1);
+      break;
+    case 'ArrowRight':
+      if (zone === 'pills') { if (pillIdx >= vp.length - 1) { zone = 'icons'; iconIdx = 0; } else pillIdx++; }
+      else if (zone === 'icons') iconIdx = Math.min(iconBtnEls.length - 1, iconIdx + 1);
+      else if (zone === 'moretv') { moreIdx = Math.min(moreCardEls.length - 1, moreIdx + 1); scrollMore(); }
+      else if (zone === 'chips') chipIdx = Math.min(chipEls.length - 1, chipIdx + 1);
+      break;
+    case 'ArrowDown':
+      if (zone === 'pills' || zone === 'icons') { lastTop = zone; openMoreTv(); zone = 'moretv'; }
+      else if (zone === 'moretv') zone = 'chips';
+      break;
+    case 'ArrowUp':
+      if (zone === 'chips') zone = 'moretv';
+      else if (zone === 'moretv') { closeMoreTv(); zone = lastTop; }
+      break;
+    case 'Enter': case ' ':
+      if (zone === 'pills' && vp.length) {
+        const a = vp[Math.min(pillIdx, vp.length - 1)].dataset.action;
+        progress = a === 'startover' ? 0 : 98; updateProgressDisplay();
+      } else if (zone === 'moretv') playCard(moreIdx);
+      else if (zone === 'chips') selectChip(chipIdx);
+      break;
+  }
+  updatePlayerFocus();
+}, true);
+
+moreCardEls.forEach((c, i) => c.addEventListener('click', () => playCard(i)));
+chipEls.forEach((c, i) => c.addEventListener('click', () => selectChip(i)));
+
+window.openPlayer = openPlayer; window.closePlayer = closePlayer; window.isPlayerOpen = () => playerIsOpen; window.hideControls = hideControls;
+})();
+
+</script>
+
+</body></html>
